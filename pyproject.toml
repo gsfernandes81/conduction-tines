@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "conduction-tines"
+version = "0.1.0"
+description = "Discord post mirroring bot"
+authors = ["geolocatingshark <geolocatingshark@gmail.com>"]
+license = "GNU AGPL-3.0-or-later"
+readme = "README.md"
+packages = [{ include = "conduction" }]
+
+[tool.poetry.dependencies]
+python = "~3.9.0"
+hikari = "2.0.0.dev113"
+
+[tool.poetry.group.dev.dependencies]
+black = "^22.12.0"
+bandit = "^1.7.4"
+pyflakes = "^3.0.1"
+rope = "^1.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
