@@ -10,6 +10,10 @@ packages = [{ include = "conduction" }]
 [tool.poetry.dependencies]
 python = "~3.9.0"
 hikari = "2.0.0.dev113"
+honcho = "^1.1.0"
+sqlalchemy = "^1.4.43"
+hikari-lightbulb = "^2.3.1"
+asyncmy = "^0.2.5"
 
 [tool.poetry.group.dev.dependencies]
 black = "^22.12.0"
