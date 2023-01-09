@@ -49,7 +49,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         embeds=msg.embeds,
                     )
                     # Record the ids in the db
-                    await MirroredMessage.add_msg_with_session(
+                    await MirroredMessage.add_msg(
                         dest_msg=mirrored_msg.id,
                         dest_channel=mirrored_msg.channel_id,
                         source_msg=msg.id,

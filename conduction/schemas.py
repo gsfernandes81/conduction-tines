@@ -21,7 +21,7 @@ from sqlalchemy.sql.expression import select
 from sqlalchemy.sql.schema import Column
 from sqlalchemy.sql.sqltypes import BigInteger
 
-from . import cfg
+from . import cfg, utils
 
 Base = declarative_base()
 db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
@@ -44,39 +44,23 @@ class MirroredMessage(Base):
         self.source_channel = int(source_channel)
 
     @classmethod
-    async def add_msg(cls, dest_msg, dest_channel, source_msg, source_channel):
-        """Create a session, begin it and add a message pair"""
-        async with db_session() as session:
-            async with session.begin():
-                message_pair = await cls.add_msg_with_session(
-                    dest_msg, dest_channel, source_msg, source_channel, session
-                )
-
-        return message_pair
-
-    @classmethod
-    async def add_msg_with_session(
-        cls, dest_msg, dest_channel, source_msg, source_channel, session
+    @utils.ensure_session(db_session)
+    async def add_msg(
+        cls, dest_msg, dest_channel, source_msg, source_channel, session=None
     ):
-        """Add a message pair using a begun session"""
+        """Create a session, begin it and add a message pair"""
         message_pair = cls(dest_msg, dest_channel, source_msg, source_channel)
         session.add(message_pair)
         return message_pair
 
     @classmethod
-    async def get_dest_msgs_and_channels(cls, source_msg: int):
-        """Return destination message ids from source message ids"""
-        async with db_session() as session:
-            async with session.begin():
-                dest_msgs = await cls.get_dest_msgs_and_channels_with_session(
-                    source_msg, session
-                )
-
-        return dest_msgs
-
-    @classmethod
-    async def get_dest_msgs_and_channels_with_session(cls, source_msg: int, session):
-        """Return destination message ids from source message ids with session"""
+    @utils.ensure_session(db_session)
+    async def get_dest_msgs_and_channels(
+        cls,
+        source_msg: int,
+        session=None,
+    ):
+        """Return dest message and channel ids from source message id"""
         dest_msgs = (
             await session.execute(
                 select(cls.dest_msg, cls.dest_channel).where(
