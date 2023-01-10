@@ -8,8 +8,8 @@ readme = "README.md"
 packages = [{ include = "conduction" }]
 
 [tool.poetry.dependencies]
-python = "~3.9.0"
-hikari = "2.0.0.dev113"
+python = "~3.11.1"
+hikari = "2.0.0.dev115"
 honcho = "^1.1.0"
 sqlalchemy = "^1.4.43"
 hikari-lightbulb = "^2.3.1"
