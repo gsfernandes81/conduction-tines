@@ -40,6 +40,7 @@ async def refresh_lost_sector_data():
 async def lost_sector_today_command(ctx: lb.Context):
     date = dt.datetime.now(tz=utc)
     sector = sector_on(date)
+    bot = ctx.bot
 
     # Follow the hyperlink to have the newest image embedded
     ls_gfx_url = await utils.follow_link_single_step(sector.shortlink_gfx)
@@ -67,7 +68,16 @@ async def lost_sector_today_command(ctx: lb.Context):
                 + "ℹ️ : <https://lostsectortoday.com/>"
             ).format(**format_dict),
             color=cfg.kyber_pink,
-        ).set_image(ls_gfx_url)
+        ).set_image(ls_gfx_url),
+        components=(
+            bot.rest.build_message_action_row()
+            .add_button(h.ButtonStyle.LINK, cfg.ls_rotation_webpage)
+            .set_label("Full rotation")
+            .add_to_container()
+            .add_button(h.ButtonStyle.LINK, cfg.ls_infogfx_webpages)
+            .set_label("All infographics")
+            .add_to_container(),
+        ),
     )
 
 
