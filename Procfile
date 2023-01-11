@@ -1,1 +1,1 @@
-main: python -m conduction
+main: python -OO -m conduction

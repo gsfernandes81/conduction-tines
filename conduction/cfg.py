@@ -17,8 +17,8 @@ import json
 import ssl
 from os import getenv as _getenv
 
+import hikari as h
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # Discord API Token
 discord_token = _getenv("DISCORD_TOKEN")
@@ -50,3 +50,22 @@ db_session_kwargs = db_session_kwargs_sync | {
 ssl_ctx = ssl.create_default_context(cafile="/etc/ssl/certs/ca-certificates.crt")
 ssl_ctx.verify_mode = ssl.CERT_REQUIRED
 db_connect_args = {"ssl": ssl_ctx}
+
+# Google sheets
+gsheets_credentials = {
+    "type": "service_account",
+    "project_id": _getenv("SHEETS_PROJECT_ID"),
+    "private_key_id": _getenv("SHEETS_PRIVATE_KEY_ID"),
+    "private_key": _getenv("SHEETS_PRIVATE_KEY").replace("\\n", "\n"),
+    "client_email": _getenv("SHEETS_CLIENT_EMAIL"),
+    "client_id": _getenv("SHEETS_CLIENT_ID"),
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://oauth2.googleapis.com/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_x509_cert_url": _getenv("SHEETS_CLIENT_X509_CERT_URL"),
+}
+sheets_ls_url = _getenv("SHEETS_LS_URL")
+
+# Discord snowflakes & constants
+alerts_channel_id = int(_getenv("ALERTS_CHANNEL_ID"))
+kyber_pink = h.Color(0xEC42A5)
