@@ -14,6 +14,8 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import typing as t
+import logging
+import aiohttp
 
 
 def ensure_session(sessionmaker):
@@ -37,3 +39,20 @@ def ensure_session(sessionmaker):
         return wrapper
 
     return ensured_session
+
+
+async def follow_link_single_step(
+    url: str, logger=logging.getLogger("main/" + __name__)
+) -> str:
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, allow_redirects=False) as resp:
+            try:
+                return resp.headers["Location"]
+            except KeyError:
+                # If we can't find the location key, warn and return the
+                # provided url itself
+                logger.info(
+                    "Could not find redirect for url "
+                    + "{}, returning as is".format(url)
+                )
+                return url
