@@ -14,19 +14,20 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import hikari as h
+from lightbulb.ext import tasks
 
 from . import cfg
 from .bot import CachedFetchBot
-from .modules import repeater
+from .modules import repeater, lost_sector
 
 bot = CachedFetchBot(
     token=cfg.discord_token,
     intents=(h.Intents.ALL_UNPRIVILEGED | h.Intents.MESSAGE_CONTENT),
 )
 
-for module in [
-    repeater,
-]:
+for module in [repeater, lost_sector]:
     module.register(bot)
 
+
+tasks.load(bot)
 bot.run()

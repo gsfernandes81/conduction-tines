@@ -17,9 +17,10 @@
 # This is the base h.CachedFetchBot but with added utility functions
 
 import hikari as h
+import lightbulb as lb
 
 
-class CachedFetchBot(h.GatewayBot):
+class CachedFetchBot(lb.BotApp):
     """lb.BotApp subclass with async methods that fetch objects from cache if possible"""
 
     async def fetch_channel(self, channel_id: int):
