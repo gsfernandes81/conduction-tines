@@ -74,7 +74,7 @@ async def lost_sector_today_command(ctx: lb.Context):
             .add_button(h.ButtonStyle.LINK, cfg.ls_rotation_webpage)
             .set_label("Full rotation")
             .add_to_container()
-            .add_button(h.ButtonStyle.LINK, cfg.ls_infogfx_webpages)
+            .add_button(h.ButtonStyle.LINK, cfg.ls_infogfx_webpage)
             .set_label("All infographics")
             .add_to_container(),
         ),
