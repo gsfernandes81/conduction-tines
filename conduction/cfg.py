@@ -20,8 +20,20 @@ from os import getenv as _getenv
 import hikari as h
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Discord API Token
+# Discord bot parameters
 discord_token = _getenv("DISCORD_TOKEN")
+test_env = _getenv("TEST_ENV") or "false"
+test_env = (
+    [int(env.strip()) for env in test_env.split(",")] if test_env != "false" else False
+)
+intents = h.Intents.ALL_UNPRIVILEGED | h.Intents.MESSAGE_CONTENT
+lightbulb_params = {
+    "token": discord_token,
+    "intents": intents,
+}
+# Only use the test env for testing if it is specified
+if test_env:
+    lightbulb_params["default_enabled_guilds"] = test_env
 
 
 # Mirror dict
