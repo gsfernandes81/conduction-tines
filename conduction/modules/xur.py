@@ -14,22 +14,27 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import hikari as h
-from lightbulb.ext import tasks
+import lightbulb as lb
 
-from . import cfg
-from .bot import CachedFetchBot
-from .modules import repeater, lost_sector, weekly_reset, xur
-
-bot = CachedFetchBot(**cfg.lightbulb_params)
-
-for module in [
-    repeater,
-    lost_sector,
-    weekly_reset,
-    xur,
-]:
-    module.register(bot)
+from .. import cfg, utils
 
 
-tasks.load(bot)
-bot.run()
+async def get_basic_xur_embed():
+    return h.Embed(
+        title="Xur",
+        url=await utils.follow_link_single_step("https://kyberscorner.com/"),
+        color=cfg.kyber_pink,
+    ).set_image("https://kyber3000.com/Xur")
+
+
+@lb.command("xur", "Find out what Xur has and where Xur isup")
+@lb.implements(lb.SlashCommand)
+async def xur_command(ctx: lb.Context):
+    await ctx.respond(await get_basic_xur_embed())
+
+
+def register(bot):
+    for command in [
+        xur_command,
+    ]:
+        bot.command(command)
