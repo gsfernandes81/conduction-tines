@@ -14,12 +14,14 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
+import datetime as dt
 
+from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.sql.expression import select
+from sqlalchemy.sql.expression import delete, select
 from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import BigInteger
+from sqlalchemy.sql.sqltypes import BigInteger, DateTime
 
 from . import cfg, utils
 
@@ -35,13 +37,22 @@ class MirroredMessage(Base):
     dest_channel = Column("dest_ch", BigInteger)
     source_msg = Column("source_msg", BigInteger)
     source_channel = Column("src_ch", BigInteger)
+    creation_datetime = Column("creation_datetime", DateTime)
 
-    def __init__(self, dest_msg, dest_channel, source_msg, source_channel):
+    def __init__(
+        self,
+        dest_msg,
+        dest_channel,
+        source_msg,
+        source_channel,
+        creation_datetime: dt.datetime | None = None,
+    ):
         super().__init__()
         self.dest_msg = int(dest_msg)
         self.dest_channel = int(dest_channel)
         self.source_msg = int(source_msg)
         self.source_channel = int(source_channel)
+        self.creation_datetime = creation_datetime or dt.datetime.now(tz=utc)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -71,6 +82,16 @@ class MirroredMessage(Base):
         # Handle source_id not found
         dest_msgs = [] if dest_msgs is None else dest_msgs
         return dest_msgs
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def prune(
+        cls, age: None | dt.timedelta = dt.timedelta(days=21), session=None
+    ):
+        """Delete entries older than <age>"""
+        await session.execute(
+            delete(cls).where(dt.datetime.now(tz=utc) - age > cls.creation_datetime)
+        )
 
 
 async def recreate_all():
