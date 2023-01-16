@@ -41,10 +41,10 @@ class MirroredMessage(Base):
 
     def __init__(
         self,
-        dest_msg,
-        dest_channel,
-        source_msg,
-        source_channel,
+        dest_msg: int,
+        dest_channel: int,
+        source_msg: int,
+        source_channel: int,
         creation_datetime: dt.datetime | None = None,
     ):
         super().__init__()
@@ -57,7 +57,12 @@ class MirroredMessage(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def add_msg(
-        cls, dest_msg, dest_channel, source_msg, source_channel, session=None
+        cls,
+        dest_msg: int,
+        dest_channel: int,
+        source_msg: int,
+        source_channel: int,
+        session=None,
     ):
         """Create a session, begin it and add a message pair"""
         message_pair = cls(dest_msg, dest_channel, source_msg, source_channel)
