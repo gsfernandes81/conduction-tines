@@ -16,18 +16,22 @@
 import asyncio
 import datetime as dt
 
+import regex as re
 from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker, validates
 from sqlalchemy.sql.expression import delete, select
 from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import BigInteger, DateTime
+from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Integer, String
 
 from . import cfg, utils
 
 Base = declarative_base()
 db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
+
+
+rgx_cmd_name_is_valid = re.compile("^([a-z][a-z0-9_-]{1,31} {0,1}){1,3}$")
 
 
 class MirroredMessage(Base):
@@ -97,6 +101,39 @@ class MirroredMessage(Base):
         await session.execute(
             delete(cls).where(dt.datetime.now(tz=utc) - age > cls.creation_datetime)
         )
+
+
+class UserCommand(Base):
+    __tablename__ = "mirrored_channel"
+    __mapper_args__ = {"eager_defaults": True}
+    command_name = Column("command_name", String(length=98))
+    # command_name can include spaces, must match rgx_command_name_is_valid
+    command_description = Column("command_description", String(length=256))
+    response_type = Column("response_type", Integer)
+    # response_types are as follows:
+    # 0: Plain text, respondes directly with response_data column text
+    # 1: Message id, copies the content of message id if possible and
+    #    responds with the same. Note: please check that message id is
+    #    accessible before adding to db
+    # 2: Embed, responds by parsing response data, parsing the same as
+    #    json, and passing it to hikari.Embed(...). This embed is sent
+    #    as a response
+    response_data = Column(String(length=32768))
+
+    @validates("command_name")
+    def command_name_validator(self, key, value: str):
+        """Restrict to valid discord command names"""
+        value = str(value).lower()
+        if rgx_cmd_name_is_valid.match(value):
+            return value
+        else:
+            raise ValueError(
+                "Command names must start with a letter, be all lowercase, and only"
+                + "contain letter, numbers, dashes (-) and underscores (_) and each"
+                + "command must not be longer than 32 characters. Spaces can be used"
+                + "to make sub commands, but subcommands cannot be deeper than 3"
+                + "levels."
+            )
 
 
 async def recreate_all():

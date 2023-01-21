@@ -16,6 +16,7 @@ python = "~3.11.1"
 sector_accounting = { git = "https://github.com/gs729/sector_accounting.git", rev = "cf35318" }
 sqlalchemy = "^1.4.43"
 aiohttp = "^3.8.3"
+regex = "^2022.10.31"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"
