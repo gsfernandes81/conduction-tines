@@ -407,3 +407,100 @@ async def test_add_command_group_to_nonexistant_group():
 
     # Check to make sure command isn't added
     assert not await UserCommand.fetch_command(cmd_group_name, cmd_name)
+
+
+@pytest.mark.asyncio
+async def test_fetch_all_command_groups():
+    cmd_group_name = "testlg1"
+    cmd_name = "testl2"
+    desc = get_function_name()
+    response_type = 1
+    response_data = "Hello"
+
+    # Add and check cmd group added
+    await UserCommand.add_command_group(cmd_group_name, description=desc)
+    await UserCommand.add_command_group(
+        cmd_group_name, cmd_group_name, description=desc
+    )
+    cmd1 = await UserCommand.fetch_command_group(cmd_group_name)
+    assert cmd1.l1_name == cmd_group_name
+    assert cmd1.description == desc
+    cmd2 = await UserCommand.fetch_command_group(cmd_group_name, cmd_group_name)
+    assert cmd2.l1_name == cmd_group_name
+    assert cmd2.description == desc
+
+    # Add and check sub cmd added to group
+    await UserCommand.add_command(
+        cmd_group_name,
+        cmd_group_name,
+        cmd_name,
+        description=desc,
+        response_type=response_type,
+        response_data=response_data,
+    )
+    cmd2 = await UserCommand.fetch_command(cmd_group_name, cmd_group_name, cmd_name)
+    assert (cmd2.l1_name, cmd2.l2_name, cmd2.l3_name) == (
+        cmd_group_name,
+        cmd_group_name,
+        cmd_name,
+    )
+    assert cmd2.description == desc
+
+    cmd_groups = await UserCommand.fetch_command_groups()
+    for cmd_group in cmd_groups:
+        # Check that only command groups are returned
+        assert cmd_group.response_type == 0
+        assert cmd_group.l3_name == ""
+
+    # Check that the lower level groups are returned first
+    assert cmd_groups[0].l1_name == cmd_group_name
+    assert cmd_groups[0].l2_name == ""
+    assert cmd_groups[1].l1_name == cmd_group_name
+    assert cmd_groups[1].l2_name == cmd_group_name
+    # Check that we only have 2 returns
+    assert len(cmd_groups) == 2
+
+
+@pytest.mark.asyncio
+async def test_fetch_all_commands():
+    cmd_group_name = "testlg1"
+    cmd_name = "testl2"
+    desc = get_function_name()
+    response_type = 1
+    response_data = "Hello"
+
+    # Add and check cmd group added
+    await UserCommand.add_command_group(cmd_group_name, description=desc)
+    await UserCommand.add_command_group(
+        cmd_group_name, cmd_group_name, description=desc
+    )
+    cmd1 = await UserCommand.fetch_command_group(cmd_group_name)
+    assert cmd1.l1_name == cmd_group_name
+    assert cmd1.description == desc
+    cmd2 = await UserCommand.fetch_command_group(cmd_group_name, cmd_group_name)
+    assert cmd2.l1_name == cmd_group_name
+    assert cmd2.description == desc
+
+    # Add and check sub cmd added to group
+    await UserCommand.add_command(
+        cmd_group_name,
+        cmd_group_name,
+        cmd_name,
+        description=desc,
+        response_type=response_type,
+        response_data=response_data,
+    )
+    cmd2 = await UserCommand.fetch_command(cmd_group_name, cmd_group_name, cmd_name)
+    assert (cmd2.l1_name, cmd2.l2_name, cmd2.l3_name) == (
+        cmd_group_name,
+        cmd_group_name,
+        cmd_name,
+    )
+    assert cmd2.description == desc
+
+    cmds = await UserCommand.fetch_commands()
+    assert len(cmds) == 1
+    assert cmds[0].l1_name == cmd2.l1_name
+    assert cmds[0].l2_name == cmd2.l2_name
+    assert cmds[0].l3_name == cmd2.l3_name
+    assert cmds[0].response_type != 0

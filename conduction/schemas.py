@@ -174,6 +174,30 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
+    async def fetch_commands(cls, session=None) -> List[UserCommand]:
+        commands = (
+            await session.execute(select(cls).where(cls.response_type != 0))
+        ).fetchall()
+        commands = [] if not commands else commands
+        commands = [command[0] for command in commands]
+        return commands
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_command_groups(cls, session=None) -> List[UserCommand]:
+        commands = (
+            await session.execute(
+                select(cls)
+                .where(cls.response_type == 0)
+                .order_by(cls.l1_name, cls.l2_name, cls.l3_name)
+            )
+        ).fetchall()
+        commands = [] if not commands else commands
+        commands = [command[0] for command in commands]
+        return commands
+
+    @classmethod
+    @utils.ensure_session(db_session)
     async def fetch_command(cls, *ln_names, session=None) -> UserCommand:
         if len(ln_names) >= 4:
             raise utils.FriendlyValueError(
