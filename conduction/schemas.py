@@ -13,16 +13,19 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import asyncio
 import datetime as dt
+from typing import List
 
 import regex as re
 from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, validates
-from sqlalchemy.sql.expression import delete, select
-from sqlalchemy.sql.schema import Column
-from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Integer, String
+from sqlalchemy.sql.expression import and_, delete, select
+from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
+from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Integer, String, Text
 
 from . import cfg, utils
 
@@ -31,7 +34,12 @@ db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_ar
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
-rgx_cmd_name_is_valid = re.compile("^([a-z][a-z0-9_-]{1,31} {0,1}){1,3}$")
+rgx_cmd_name_is_valid = re.compile("^[a-z][a-z0-9_-]{1,31}$")
+rgx_sub_cmd_name_is_valid = re.compile("^[a-z]{0,1}[a-z0-9_-]{0,31}$")
+# The difference between command and sub command name validator regexes is
+# that the sub command regex needs to allow blank strings to indicate and
+# match blanks for commands that aren't 3 layers deep (where the last and)
+# potentially the second last layer will be blank
 
 
 class MirroredMessage(Base):
@@ -104,36 +112,328 @@ class MirroredMessage(Base):
 
 
 class UserCommand(Base):
-    __tablename__ = "mirrored_channel"
+    __tablename__ = "user_command"
     __mapper_args__ = {"eager_defaults": True}
-    command_name = Column("command_name", String(length=98))
+    __table_args__ = (
+        UniqueConstraint("l1_name", "l2_name", "l3_name", name="_ln_name_uc"),
+        # Make sure if l3_name is empty then response_type is 0
+        # ie either l3_name can be empty or response_type can be non 0
+        CheckConstraint("l3_name = '' OR response_type <> 0"),
+        # Make sure if l2_name is empty, the so is l3
+        CheckConstraint("(l2_name = '' AND l3_name = '') OR (l2_name <> '')"),
+    )
+    id = Column("id", Integer, primary_key=True)
+    l1_name = Column("l1_name", String(length=32))
+    l2_name = Column("l2_name", String(length=32))
+    l3_name = Column("l3_name", String(length=32))
     # command_name can include spaces, must match rgx_command_name_is_valid
-    command_description = Column("command_description", String(length=256))
+    description = Column("description", String(length=256))
     response_type = Column("response_type", Integer)
     # response_types are as follows:
-    # 0: Plain text, respondes directly with response_data column text
-    # 1: Message id, copies the content of message id if possible and
+    # 0: No response, ie this is a command group
+    # 1: Plain text, respondes directly with response_data column text
+    # 2: Message id, copies the content of message id if possible and
     #    responds with the same. Note: please check that message id is
     #    accessible before adding to db
-    # 2: Embed, responds by parsing response data, parsing the same as
+    # 3: Embed, responds by parsing response data, parsing the same as
     #    json, and passing it to hikari.Embed(...). This embed is sent
     #    as a response
-    response_data = Column(String(length=32768))
+    response_data = Column(Text)
+    # TODO move from using None to "", "*" or "."
+    def __init__(
+        self,
+        l1_name: str,
+        l2_name: str = "",
+        l3_name: str = "",
+        *,
+        description: str,
+        response_type: int,
+        response_data: str = "",
+    ):
+        self.l1_name = str(l1_name)
+        self.l2_name = str(l2_name)
+        self.l3_name = str(l3_name)
+        self.description = str(description)
+        self.response_type = int(response_type)
+        self.response_data = str(response_data)
 
-    @validates("command_name")
+    @validates("l1_name", "l2_name", "l3_name")
     def command_name_validator(self, key, value: str):
         """Restrict to valid discord command names"""
-        value = str(value).lower()
-        if rgx_cmd_name_is_valid.match(value):
+        value = str(value)
+        if key == "l1_name" and rgx_cmd_name_is_valid.match(value):
+            return value
+        elif key in ["l2_name", "l3_name"] and rgx_sub_cmd_name_is_valid.match(value):
             return value
         else:
-            raise ValueError(
-                "Command names must start with a letter, be all lowercase, and only"
-                + "contain letter, numbers, dashes (-) and underscores (_) and each"
-                + "command must not be longer than 32 characters. Spaces can be used"
-                + "to make sub commands, but subcommands cannot be deeper than 3"
-                + "levels."
+            raise utils.FriendlyValueError(
+                "Command names must start with a letter, be all lowercase, and only "
+                + "contain letter, numbers, dashes (-) and underscores (_) and must "
+                + "not be longer than 32 characters. Spaces cannot be used."
             )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_command(cls, *ln_names, session=None) -> UserCommand:
+        if len(ln_names) >= 4:
+            raise utils.FriendlyValueError(
+                "Discord does not support slash commands with more than 3 layers"
+            )
+        elif len(ln_names) == 0:
+            raise ValueError("Too few ln_names provided, need at least 1")
+
+        # Pad ln_names with "" up to len 3
+        ln_names = list(ln_names)
+        ln_names.extend([""] * (3 - len(ln_names)))
+
+        return (
+            await session.execute(
+                select(cls).where(
+                    and_(
+                        cls.l1_name == ln_names[0],
+                        cls.l2_name == ln_names[1],
+                        cls.l3_name == ln_names[2],
+                        cls.response_type != 0,
+                    )
+                )
+            )
+        ).scalar()
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_command_group(cls, *ln_names, session=None) -> UserCommand:
+        if len(ln_names) >= 3:
+            raise utils.FriendlyValueError(
+                "Discord does not support slash command groups more than "
+                + "2 layers deep"
+            )
+        elif len(ln_names) == 0:
+            raise ValueError("Too few ln_names provided, need at least 1")
+
+        # Pad ln_names with "" up to len 3
+        ln_names = list(ln_names)
+        ln_names.extend([""] * (2 - len(ln_names)))
+
+        return (
+            await session.execute(
+                select(cls).where(
+                    and_(
+                        cls.l1_name == ln_names[0],
+                        cls.l2_name == ln_names[1],
+                        cls.response_type == 0,
+                    )
+                )
+            )
+        ).scalar()
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_command(
+        cls,
+        *ln_names,  # Layer n names
+        description: str,
+        response_type: int,
+        response_data: str,
+        session=None,
+    ):
+        if len(ln_names) >= 4:
+            raise utils.FriendlyValueError(
+                "Discord does not support slash commands with more than 3 layers"
+            )
+        if len(ln_names) > 1:
+            # Check if the command group exists if we are trying to make a subcommand
+            await cls.check_command_group_exists(
+                *ln_names[: min(len(ln_names) - 1, 2)], session=session
+            )
+
+        # Check if there is an existing command with the same name
+        existing_command = await cls.fetch_command(*ln_names, session=session)
+        if existing_command:
+            raise utils.FriendlyValueError(
+                f"Command {' -> '.join(filter(lambda n: n is not None, ln_names))} already exists"
+            )
+
+        self = cls(
+            *ln_names,
+            description=description,
+            response_type=response_type,
+            response_data=response_data,
+        )
+        session.add(self)
+        return self
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_command_group(cls, *ln_names, description, session=None):
+        return await cls.add_command(
+            *ln_names,
+            description=description,
+            response_type=0,  # Response type 0 for command groups
+            session=session,
+            response_data=None,
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def check_command_group_exists(
+        cls,
+        l1_name: str,
+        l2_name: str = "",
+        session=None,
+    ):
+        """Check if l1_name and if provided, l2_name command groups exist
+
+        Note, this is different from the command existing (response_type must be 0)
+
+        raises utils.FriendlyValueError if command groups specified do not exist"""
+        l1_exists = (
+            await session.execute(
+                select(cls.id).where(
+                    # Check whether l1_name exists with a 0 response type
+                    # since 0 response types signify a command group
+                    and_(cls.l1_name == l1_name, cls.response_type == 0)
+                )
+            )
+        ).scalar()
+        # scalar only returns false (None) when no rows are found
+
+        if not l1_exists:
+            raise utils.FriendlyValueError(
+                f"{l1_name} is not an existing command group",
+            )
+
+        if l2_name:
+            # Only check if l2_name exists if the name is provided
+            l2_exists = (
+                await session.execute(
+                    select(cls.id).where(
+                        and_(
+                            # Check whether l1_name -> l2_name exists with a 0 response
+                            # type since 0 response types signify a command group
+                            cls.l1_name == l1_name,
+                            cls.l2_name == l2_name,
+                            cls.response_type == 0,
+                        )
+                    )
+                )
+            ).scalar()
+            # scalar only returns false (None) when no rows are found
+
+            if not l2_exists:
+                raise utils.FriendlyValueError(
+                    f"{l1_name} -> {l2_name} is not an existing command group",
+                )
+
+        # Return true if command groups exist
+        return True
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_subcommands(cls, l1_name, l2_name: str = "", session=None):
+        return (
+            await session.execute(
+                select(cls).where(
+                    and_(
+                        cls.l1_name == l1_name,
+                        # The below is to handle subcommands of command groups
+                        # at the top layer where l2_name will not be specified
+                        # when trying to fetch subcommands
+                        (cls.l2_name == l2_name) if l2_name else True,
+                        cls.response_type != 0,
+                    )
+                )
+            )
+        ).fetchall()
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def delete_command(
+        cls,
+        l1_name: str,
+        l2_name: str = "",
+        l3_name: str = "",
+        fetch_deleted: bool = True,
+        session=None,
+    ) -> UserCommand:
+        commands_to_delete = (
+            (
+                await session.execute(
+                    select(cls).where(
+                        and_(
+                            cls.l1_name == l1_name,
+                            cls.l2_name == l2_name,
+                            cls.l3_name == l3_name,
+                            cls.response_type != 0,
+                        )
+                    )
+                )
+            ).scalar()
+            if fetch_deleted  # Do not fetch if fetch_deleted is False
+            else []
+        )
+
+        await session.execute(
+            delete(cls).where(
+                and_(
+                    cls.l1_name == l1_name,
+                    cls.l2_name == l2_name,
+                    cls.l3_name == l3_name,
+                    cls.response_type != 0,
+                )
+            )
+        )
+        return commands_to_delete
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def delete_command_group(
+        cls,
+        l1_name: str,
+        l2_name: str = "",
+        cascade: bool = False,
+        fetch_deleted: bool = True,
+        session=None,
+    ) -> List[UserCommand]:
+        subcommands = await cls.fetch_subcommands(l1_name, l2_name, session=session)
+        if subcommands and not cascade:
+            # Handle the case where subcommands are found and we aren't supposed
+            # to cascade delete
+            raise utils.FriendlyValueError(
+                f"Command group {l1_name}{(' -> ' + l2_name) if l2_name else ''} "
+                + "still has subcommands"
+            )
+        else:
+            # If cascade delete is not specified then the below will only delete the
+            # command group since we already know that there are no subcommands as per
+            # the above branch
+            # If cascade delete is True, delete all with matching l1 & if specified l2
+            # names
+
+            deleted = (
+                (
+                    await session.execute(
+                        select(cls).where(
+                            and_(
+                                cls.l1_name == l1_name,
+                                (cls.l2_name == l2_name) if l2_name else True,
+                            )
+                        )
+                    )
+                ).fetchall()
+                if fetch_deleted  # Do not fetch if fetch_delted is False
+                else []
+            )
+            await session.execute(
+                delete(cls).where(
+                    and_(
+                        cls.l1_name == l1_name,
+                        (cls.l2_name == l2_name) if l2_name else True,
+                    )
+                )
+            )
+            deleted = [] if not deleted else deleted
+            deleted = [item[0] for item in deleted]
+            return deleted
 
 
 async def recreate_all():

@@ -1,0 +1,2 @@
+test: python -m pytest
+# main: python -m conduction.schemas_test

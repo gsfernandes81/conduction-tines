@@ -13,8 +13,10 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
-import typing as t
+import inspect
 import logging
+import typing as t
+
 import aiohttp
 
 
@@ -56,3 +58,12 @@ async def follow_link_single_step(
                     + "{}, returning as is".format(url)
                 )
                 return url
+
+
+class FriendlyValueError(ValueError):
+    pass
+
+
+def get_function_name() -> str:
+    """Get the name of the function this was called from"""
+    return inspect.stack()[1][3]
