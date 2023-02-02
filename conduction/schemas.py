@@ -199,12 +199,7 @@ class UserCommand(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def fetch_command(cls, *ln_names, session=None) -> UserCommand:
-        if len(ln_names) >= 4:
-            raise utils.FriendlyValueError(
-                "Discord does not support slash commands with more than 3 layers"
-            )
-        elif len(ln_names) == 0:
-            raise ValueError("Too few ln_names provided, need at least 1")
+        utils.check_number_of_layers(ln_names)
 
         # Pad ln_names with "" up to len 3
         ln_names = list(ln_names)
@@ -260,15 +255,8 @@ class UserCommand(Base):
         response_data: str,
         session=None,
     ):
-        if len(ln_names) >= 4:
-            raise utils.FriendlyValueError(
-                "Discord does not support slash commands with more than 3 layers"
-            )
-        if len(ln_names) > 1:
-            # Check if the command group exists if we are trying to make a subcommand
-            await cls.check_command_group_exists(
-                *ln_names[: min(len(ln_names) - 1, 2)], session=session
-            )
+        utils.check_number_of_layers(ln_names)
+        await cls.check_parent_command_groups_exist(*ln_names, session=session)
 
         # Check if there is an existing command with the same name
         existing_command = await cls.fetch_command(*ln_names, session=session)
@@ -299,35 +287,39 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def check_command_group_exists(
+    async def check_parent_command_groups_exist(
         cls,
         l1_name: str,
         l2_name: str = "",
+        l3_name: str = "",
         session=None,
     ):
-        """Check if l1_name and if provided, l2_name command groups exist
+        """Check if the parent command groups exist
 
         Note, this is different from the command existing (response_type must be 0)
 
         raises utils.FriendlyValueError if command groups specified do not exist"""
-        l1_exists = (
-            await session.execute(
-                select(cls.id).where(
-                    # Check whether l1_name exists with a 0 response type
-                    # since 0 response types signify a command group
-                    and_(cls.l1_name == l1_name, cls.response_type == 0)
-                )
-            )
-        ).scalar()
-        # scalar only returns false (None) when no rows are found
-
-        if not l1_exists:
-            raise utils.FriendlyValueError(
-                f"{l1_name} is not an existing command group",
-            )
 
         if l2_name:
-            # Only check if l2_name exists if the name is provided
+            # Only check l1_name if l3_name command is provided
+            l1_exists = (
+                await session.execute(
+                    select(cls.id).where(
+                        # Check whether l1_name exists with a 0 response type
+                        # since 0 response types signify a command group
+                        and_(cls.l1_name == l1_name, cls.response_type == 0)
+                    )
+                )
+            ).scalar()
+            # scalar only returns false (None) when no rows are found
+
+            if not l1_exists:
+                raise utils.FriendlyValueError(
+                    f"{l1_name} is not an existing command group",
+                )
+
+        if l3_name:
+            # Only check if l2_name exists if l3_name command is provided
             l2_exists = (
                 await session.execute(
                     select(cls.id).where(
