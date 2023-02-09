@@ -139,7 +139,7 @@ class UserCommand(Base):
     #    json, and passing it to hikari.Embed(...). This embed is sent
     #    as a response
     response_data = Column(Text)
-    # TODO move from using None to "", "*" or "."
+
     def __init__(
         self,
         l1_name: str,
@@ -156,6 +156,11 @@ class UserCommand(Base):
         self.description = str(description)
         self.response_type = int(response_type)
         self.response_data = str(response_data)
+
+    def __repr__(self) -> str:
+        return " -> ".join(
+            ln_name for ln_name in [self.l1_name, self.l2_name, self.l3_name] if ln_name
+        )
 
     @validates("l1_name", "l2_name", "l3_name")
     def command_name_validator(self, key, value: str):
@@ -450,6 +455,24 @@ class UserCommand(Base):
             deleted = [] if not deleted else deleted
             deleted = [item[0] for item in deleted]
             return deleted
+
+    @property
+    def is_command_group(self):
+        return self.response_type == 0
+
+    @property
+    def is_subcommand_or_subgroup(self):
+        return self.depth > 1
+
+    @property
+    def depth(self):
+        return len(self.ln_names)
+
+    @property
+    def ln_names(self):
+        return [
+            ln_name for ln_name in [self.l1_name, self.l2_name, self.l3_name] if ln_name
+        ]
 
 
 async def recreate_all():
