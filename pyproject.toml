@@ -8,13 +8,13 @@ readme = "README.md"
 packages = [{ include = "conduction" }]
 
 [tool.poetry.dependencies]
-asyncmy = "^0.2.5"
+asyncmy = "^0.2.7rc6"
 hikari = "2.0.0.dev115"
 hikari-lightbulb = { version = "^2.3.1", extras = ["crontrigger"] }
 honcho = "^1.1.0"
 python = "~3.11.1"
 sector_accounting = { git = "https://github.com/gs729/sector_accounting.git", rev = "cf35318" }
-sqlalchemy = "^1.4.43"
+sqlalchemy = "^2.0.1"
 aiohttp = "^3.8.3"
 regex = "^2022.10.31"
 
