@@ -69,12 +69,17 @@ def get_function_name() -> str:
     return inspect.stack()[1][3]
 
 
-def check_number_of_layers(ln_names, min_layers: int = 1, max_layers: int = 3):
+def check_number_of_layers(
+    ln_names: list | int, min_layers: int = 1, max_layers: int = 3
+):
     """Raises FriendlyValueError on too many layers of commands"""
-    if len(ln_names) > max_layers:
+
+    ln_name_length = len(ln_names) if ln_names is not int else ln_names
+
+    if ln_name_length > max_layers:
         raise FriendlyValueError(
             "Discord does not support slash "
             + f"commands with more than {max_layers} layers"
         )
-    elif len(ln_names) < min_layers:
+    elif ln_name_length < min_layers:
         raise ValueError(f"Too few ln_names provided, need at least {min_layers}")
