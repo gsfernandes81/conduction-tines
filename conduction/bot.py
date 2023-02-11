@@ -19,6 +19,9 @@
 import hikari as h
 import lightbulb as lb
 
+from . import utils, schemas
+import typing as t
+
 
 class CachedFetchBot(lb.BotApp):
     """lb.BotApp subclass with async methods that fetch objects from cache if possible"""
@@ -61,3 +64,109 @@ class CachedFetchBot(lb.BotApp):
     async def fetch_user(self, user: int):
         """This method fetches a user from the cache or from discord if not cached"""
         return self.cache.get_user(user) or await self.rest.fetch_user(user)
+
+
+class UserCommandBot(lb.BotApp):
+    def is_existing_command(self, *ln_names) -> bool:
+        """Check if a command is registered with a bot,
+
+        Note: Does not differentiate between commands and command groups"""
+
+        utils.check_number_of_layers(ln_names)
+
+        # lb.BotApp._slash_commands is a dict of names to CommandLike instances
+        commands_group = self._slash_commands
+
+        for ln_name in ln_names:
+            # Existing command will be None if no such command exists
+            existing_command = commands_group.get(ln_name)
+            if not existing_command:
+                return False
+            is_command_group = isinstance(existing_command, lb.SlashGroupMixin)
+            # If existing_command is a command group then check if the next
+            # ln_name exists in it in the next cycle
+            # If it is not then make commands_group an empty dict
+            # when we try and check if a command exists here in the next cycle
+            # this will return false, and if no next cycle occurs because we checked
+            # all ln_names already, this will return true
+            commands_group = existing_command.subcommands if is_command_group else {}
+
+        return True
+
+    def get_command_group(self, *ln_names) -> lb.CommandLike:
+        """Get an existing command group from the bot
+
+        Note: Only supports a depth of 2 since the current discord limit is 3 layers
+              of subcommands"""
+        utils.check_number_of_layers(ln_names, max_layers=2)
+
+        # Note command_group will be None if not found
+        command_group: lb.Command = self._slash_commands.get(ln_names[0])
+
+        if len(ln_names) > 1:
+            for subgroup in command_group._initialiser.subcommands:
+                if subgroup.name == ln_names[1]:
+                    command_group == subgroup
+                    break
+            else:
+                # Note command_group will be None if not found
+                command_group = None
+
+        if command_group:
+            return command_group._initialiser
+        else:
+            raise ValueError(f"Command group {' -> '.join(ln_names)} was not found")
+
+    async def sync_schema_to_bot_cmds(self, schema: t.Type[schemas.UserCommand]):
+        """Sync commands from <schema> in db to the bot"""
+        schema_commands = (
+            await schema.fetch_command_groups() + await schema.fetch_commands()
+        )
+
+        for cmd in schema_commands:
+            if not self.is_existing_command(cmd.l1_name, cmd.l2_name, cmd.l3_name):
+                self.command(cmd)
+
+    async def sync_bot_cmds_to_discord(self):
+        """Sync commands added to the bot to discord
+
+        Effectively an alias of the sync_application_commands method"""
+        await self.sync_application_commands()
+
+    def command(
+        self, cmd: t.Optional[lb.CommandLike | schemas.UserCommand] = None
+    ) -> t.Union[lb.CommandLike, t.Callable[[lb.CommandLike], lb.CommandLike],]:
+        """Handle schema based commands and lightbulb commands
+
+        Throws a utils.FriendlyValueError if a schema command is already defined"""
+
+        if not isinstance(cmd, schemas.UserCommand):
+            return super().command(cmd)
+
+        if self.is_existing_command(*cmd.ln_names):
+            raise utils.FriendlyValueError(f"Command {cmd} is already defined")
+
+        if cmd.is_command_group:
+            # Command group impls
+            if cmd.is_subcommand_or_subgroup:
+                impl_type = lb.SlashSubGroup
+            else:
+                impl_type = lb.SlashCommandGroup
+        else:
+            # Command impls
+            if cmd.is_subcommand_or_subgroup:
+                impl_type = lb.SlashSubCommand
+            else:
+                impl_type = lb.SlashCommand
+
+        @lb.command(cmd.ln_names[-1], cmd.description)
+        @lb.implements(impl_type)
+        async def _responder(ctx: lb.Context):
+            await ctx.respond("Test test")
+
+        if cmd.is_subcommand_or_subgroup:
+            register_command = self.get_command_group(*cmd.ln_names[:-1]).child
+        else:
+            register_command = super().command
+
+        return register_command(_responder)
