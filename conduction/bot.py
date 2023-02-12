@@ -134,6 +134,9 @@ class UserCommandBot(lb.BotApp):
 
     async def sync_schema_to_bot_cmds(self):
         """Sync commands from schema in db to the bot"""
+        # TODO Delete commands no longer in schema
+        #      take care not to delete commands defined normally
+
         schema_commands = (
             await self._user_command_schema.fetch_command_groups()
             + await self._user_command_schema.fetch_commands()
@@ -147,7 +150,11 @@ class UserCommandBot(lb.BotApp):
         """Sync commands added to the bot to discord
 
         Effectively an alias of the sync_application_commands method"""
-        await self.sync_application_commands()
+        await super().sync_application_commands()
+
+    async def sync_application_commands(self) -> None:
+        await self.sync_schema_to_bot_cmds()
+        await self.sync_bot_cmds_to_discord()
 
     def command(
         self, cmd: t.Optional[lb.CommandLike | schemas.UserCommand] = None
@@ -160,7 +167,13 @@ class UserCommandBot(lb.BotApp):
             return super().command(cmd)
 
         if self.is_existing_command(*cmd.ln_names):
-            raise utils.FriendlyValueError(f"Command {cmd} is already defined")
+            if len(cmd.ln_names) > 1:
+                cmd_group = self.get_command_group(*cmd.ln_names[:-1])
+                for existing_cmd in cmd_group.subcommands:
+                    if existing_cmd.name == cmd.ln_names[-1]:
+                        cmd_group.subcommands.remove(existing_cmd)
+            else:
+                self.remove_command(self._slash_commands.get(cmd.l1_name))
 
         if cmd.is_subcommand_or_subgroup:
             register_command = self.get_command_group(*cmd.ln_names[:-1]).child
