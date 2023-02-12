@@ -80,7 +80,8 @@ sheets_ls_url = _getenv("SHEETS_LS_URL")
 
 # Discord snowflakes & constants
 alerts_channel_id = int(_getenv("ALERTS_CHANNEL_ID"))
-kyber_pink = h.Color(0xEC42A5)
+embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
+control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
 
 # Kyber's links
 ls_rotation_webpage = _getenv("LS_ROTATION_WEBPAGE")
