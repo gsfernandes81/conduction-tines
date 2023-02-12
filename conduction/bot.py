@@ -98,24 +98,31 @@ class UserCommandBot(lb.BotApp):
 
         Note: Only supports a depth of 2 since the current discord limit is 3 layers
               of subcommands"""
+
+        cmd_not_found_exc = ValueError(
+            f"Command group {' -> '.join(ln_names)} was not found"
+        )
+
         utils.check_number_of_layers(ln_names, max_layers=2)
 
-        # Note command_group will be None if not found
-        command_group: lb.Command = self._slash_commands.get(ln_names[0])
+        try:
+            # Try to find the command group
+            command_group: lb.Command = self._slash_commands[ln_names[0]]._initialiser
+        except KeyError:
+            raise cmd_not_found_exc
 
         if len(ln_names) > 1:
-            for subgroup in command_group._initialiser.subcommands:
-                if subgroup.name == ln_names[1]:
-                    command_group == subgroup
-                    break
-            else:
-                # Note command_group will be None if not found
-                command_group = None
+            # Try to find the subgroup if asked for
+            try:
+                command_group = [
+                    subgroup
+                    for subgroup in command_group.subcommands
+                    if subgroup.name == ln_names[1]
+                ][0]
+            except IndexError:
+                raise cmd_not_found_exc
 
-        if command_group:
-            return command_group._initialiser
-        else:
-            raise ValueError(f"Command group {' -> '.join(ln_names)} was not found")
+        return command_group
 
     async def sync_schema_to_bot_cmds(self, schema: t.Type[schemas.UserCommand]):
         """Sync commands from <schema> in db to the bot"""
