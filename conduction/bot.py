@@ -16,11 +16,13 @@
 # Define our custom discord bot classes
 # This is the base h.CachedFetchBot but with added utility functions
 
+import json
+import typing as t
+
 import hikari as h
 import lightbulb as lb
 
-from . import utils, schemas
-import typing as t
+from . import schemas, utils, cfg
 
 
 class CachedFetchBot(lb.BotApp):
@@ -67,6 +69,12 @@ class CachedFetchBot(lb.BotApp):
 
 
 class UserCommandBot(lb.BotApp):
+    def __init__(
+        self, *args, user_command_schema: t.Type[schemas.UserCommand], **kwargs
+    ):
+        super().__init__(*args, **kwargs)
+        self._user_command_schema = user_command_schema
+
     def is_existing_command(self, *ln_names) -> bool:
         """Check if a command is registered with a bot,
 
@@ -124,10 +132,11 @@ class UserCommandBot(lb.BotApp):
 
         return command_group
 
-    async def sync_schema_to_bot_cmds(self, schema: t.Type[schemas.UserCommand]):
-        """Sync commands from <schema> in db to the bot"""
+    async def sync_schema_to_bot_cmds(self):
+        """Sync commands from schema in db to the bot"""
         schema_commands = (
-            await schema.fetch_command_groups() + await schema.fetch_commands()
+            await self._user_command_schema.fetch_command_groups()
+            + await self._user_command_schema.fetch_commands()
         )
 
         for cmd in schema_commands:
@@ -153,6 +162,18 @@ class UserCommandBot(lb.BotApp):
         if self.is_existing_command(*cmd.ln_names):
             raise utils.FriendlyValueError(f"Command {cmd} is already defined")
 
+        if cmd.is_subcommand_or_subgroup:
+            register_command = self.get_command_group(*cmd.ln_names[:-1]).child
+        else:
+            register_command = super().command
+
+        return register_command(self._user_command_response_func_builder(cmd))
+
+    @staticmethod
+    def _user_command_response_func_builder(
+        cmd: schemas.UserCommand,
+    ) -> t.Coroutine:
+
         if cmd.is_command_group:
             # Command group impls
             if cmd.is_subcommand_or_subgroup:
@@ -166,14 +187,43 @@ class UserCommandBot(lb.BotApp):
             else:
                 impl_type = lb.SlashCommand
 
-        @lb.command(cmd.ln_names[-1], cmd.description)
-        @lb.implements(impl_type)
-        async def _responder(ctx: lb.Context):
-            await ctx.respond("Test test")
+        # Create a decorator for the command
+        decorator = lambda func: lb.command(cmd.ln_names[-1], cmd.description)(
+            lb.implements(impl_type)(func)
+        )
 
-        if cmd.is_subcommand_or_subgroup:
-            register_command = self.get_command_group(*cmd.ln_names[:-1]).child
-        else:
-            register_command = super().command
+        if cmd.response_type == 0:
 
-        return register_command(_responder)
+            @decorator
+            async def _responder(ctx: lb.Context):
+                pass
+
+        elif cmd.response_type == 1:
+
+            @decorator
+            async def _responder(ctx: lb.Context):
+                await ctx.respond(cmd.response_data)
+
+        elif cmd.response_type == 2:
+
+            @decorator
+            async def _responder(ctx: lb.Context):
+                msg_to_respond_with = await ctx.bot.rest.fetch_message(
+                    *[int(id_) for id_ in cmd.response_data.split(":")]
+                )
+                await ctx.respond(
+                    msg_to_respond_with.content,
+                    embeds=msg_to_respond_with.embeds,
+                    components=msg_to_respond_with.components,
+                    attachments=msg_to_respond_with.attachments,
+                )
+
+        elif cmd.response_type == 3:
+            embed_kwargs = json.decoder.JSONDecoder().decode(cmd.response_data)
+            embed_kwargs["color"] = embed_kwargs.get("color") or cfg.embed_default_color
+
+            @decorator
+            async def _responder(ctx: lb.Context):
+                await ctx.respond(h.Embed(**embed_kwargs))
+
+        return _responder
