@@ -68,6 +68,45 @@ class CachedFetchBot(lb.BotApp):
         return self.cache.get_user(user) or await self.rest.fetch_user(user)
 
 
+class SchemaBackedCommand:
+    """Base class for schema backed commands in a lightbulb bot
+
+    Differentiates normally defined commands from schema based / user commands"""
+
+    @staticmethod
+    def impl_from_user_command(cmd: schemas.UserCommand):
+        if cmd.is_command_group:
+            # Command group impls
+            if cmd.is_subcommand_or_subgroup:
+                impl_type = SBSlashSubGroup
+            else:
+                impl_type = SBSlashCommandGroup
+        else:
+            # Command impls
+            if cmd.is_subcommand_or_subgroup:
+                impl_type = SBSlashSubCommand
+            else:
+                impl_type = SBSlashCommand
+
+        return impl_type
+
+
+class SBSlashCommand(SchemaBackedCommand, lb.SlashCommand):
+    pass
+
+
+class SBSlashSubCommand(SchemaBackedCommand, lb.SlashSubCommand):
+    pass
+
+
+class SBSlashCommandGroup(SchemaBackedCommand, lb.SlashCommandGroup):
+    pass
+
+
+class SBSlashSubGroup(SchemaBackedCommand, lb.SlashSubGroup):
+    pass
+
+
 class UserCommandBot(lb.BotApp):
     def __init__(
         self, *args, user_command_schema: t.Type[schemas.UserCommand], **kwargs
@@ -134,8 +173,12 @@ class UserCommandBot(lb.BotApp):
 
     async def sync_schema_to_bot_cmds(self):
         """Sync commands from schema in db to the bot"""
-        # TODO Delete commands no longer in schema
-        #      take care not to delete commands defined normally
+
+        # Remove all commands and command groups that are schema based
+        # Currently only deletes layer 1 commands and groups
+        for command in self.slash_commands:
+            if isinstance(command, SchemaBackedCommand):
+                self.remove_command(command)
 
         schema_commands = (
             await self._user_command_schema.fetch_command_groups()
@@ -186,23 +229,9 @@ class UserCommandBot(lb.BotApp):
     def _user_command_response_func_builder(
         cmd: schemas.UserCommand,
     ) -> t.Coroutine:
-
-        if cmd.is_command_group:
-            # Command group impls
-            if cmd.is_subcommand_or_subgroup:
-                impl_type = lb.SlashSubGroup
-            else:
-                impl_type = lb.SlashCommandGroup
-        else:
-            # Command impls
-            if cmd.is_subcommand_or_subgroup:
-                impl_type = lb.SlashSubCommand
-            else:
-                impl_type = lb.SlashCommand
-
         # Create a decorator for the command
         decorator = lambda func: lb.command(cmd.ln_names[-1], cmd.description)(
-            lb.implements(impl_type)(func)
+            lb.implements(SchemaBackedCommand.impl_from_user_command(cmd))(func)
         )
 
         if cmd.response_type == 0:
