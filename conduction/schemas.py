@@ -135,6 +135,7 @@ class UserCommand(Base):
     # 2: Message id, copies the content of message id if possible and
     #    responds with the same. Note: please check that message id is
     #    accessible before adding to db
+    #    response_data must be in the form channel_id:message_id
     # 3: Embed, responds by parsing response data, parsing the same as
     #    json, and passing it to hikari.Embed(...). This embed is sent
     #    as a response
