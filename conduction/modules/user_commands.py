@@ -20,7 +20,7 @@ import typing as t
 import traceback as tb
 
 from .. import cfg
-from ..schemas import UserCommand
+from ..schemas import UserCommand, db_session
 from ..bot import UserCommandBot
 
 # TODO
@@ -74,24 +74,24 @@ async def layer_name_autocomplete(
         return options
 
 
-def layer_options(autocomplete: bool):
+def layer_options(autocomplete: bool, postfix: str = ""):
     """Decorator to add layer options to command with optional autocompletion"""
 
     def decorator_actual(func):
         return lb.option(
-            "layer3",
+            "layer3" + postfix,
             "1st layer commands and groups",
             autocomplete=autocomplete and layer_name_autocomplete,
             default="",
         )(
             lb.option(
-                "layer2",
+                "layer2" + postfix,
                 "1st layer commands and groups",
                 autocomplete=autocomplete and layer_name_autocomplete,
                 default="",
             )(
                 lb.option(
-                    "layer1",
+                    "layer1" + postfix,
                     "1st layer commands and groups",
                     autocomplete=autocomplete and layer_name_autocomplete,
                 )(func)
@@ -101,7 +101,7 @@ def layer_options(autocomplete: bool):
     return decorator_actual
 
 
-def schema_options(type_needed, description_needed):
+def schema_options(type_needed, description_needed, command_groups_allowed=False):
     """Decorator to add non layer schema options to commands"""
 
     def decorator_actual(func):
@@ -137,7 +137,7 @@ def schema_options(type_needed, description_needed):
 
 
 @command_group.child
-@schema_options(type_needed=True, description_needed=True)
+@schema_options(type_needed=True, description_needed=True, command_groups_allowed=True)
 @layer_options(autocomplete=False)
 @lb.command("add", "Add a command", pass_options=True, inherit_checks=True)
 @lb.implements(lb.SlashSubCommand)
@@ -236,6 +236,106 @@ async def edit_command(
 
     # Resync with discord
     await bot.sync_application_commands()
+
+
+@command_group.child
+@layer_options(autocomplete=True, postfix="new")
+@layer_options(autocomplete=True)
+@lb.command(
+    "rename",
+    "Rename a command or command group",
+    pass_options=True,
+    inherit_checks=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def rename_command_or_group(
+    ctx: lb.Context,
+    layer1: str,
+    layer2: str,
+    layer3: str,
+    layer1new: str,
+    layer2new: str,
+    layer3new: str,
+):
+    # Manually defer
+    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
+    bot: UserCommandBot = ctx.bot
+
+    try:
+        async with db_session() as session:
+            async with session.begin():
+                # Delete subject command or group from db
+                deleted_commands: t.List[UserCommand] = []
+
+                # If layer3 is not specified then try and rename any groups
+                # as well since there might be one specified
+                deleted_commands.extend(
+                    await UserCommand.delete_command_group(
+                        layer1, layer2, cascade=True, session=session
+                    )
+                    if not layer3
+                    else []
+                )
+
+                deleted_commands.append(
+                    await UserCommand.delete_command(
+                        layer1, layer2, layer3, session=session
+                    )
+                )
+
+                added_commands = []
+                for deleted_command in deleted_commands:
+                    if not deleted_command:
+                        continue
+                    # Add commands back with new parameters
+                    added_commands.append(
+                        await UserCommand.add_command(
+                            layer1new or deleted_command.l1_name,
+                            layer2new or deleted_command.l2_name,
+                            layer3new or deleted_command.l3_name,
+                            description=deleted_command.description,
+                            response_type=deleted_command.response_type,
+                            response_data=deleted_command.response_data,
+                            session=session,
+                        )
+                    )
+
+        # Resync with discord
+        # Note: Consider reusing the above session for this
+        await bot.sync_application_commands()
+    except Exception as e:
+        # If an exception occurs, respond with it as a message
+        logging.error(e)
+        await ctx.respond(
+            "An error occured renaming the `{}` to `{}`.".format(
+                " -> ".join(
+                    [layer for layer in [layer1, layer2, layer3] if layer != ""]
+                ),
+                " -> ".join(
+                    [
+                        layer
+                        for layer in [layer1new, layer2new, layer3new]
+                        if layer != ""
+                    ]
+                ),
+            )
+            + "\n\n Error trace:\n```"
+            + "\n".join(tb.format_exception(e))
+            + "\n```"
+        )
+    else:
+        # Otherwise confirm success
+        await ctx.respond(
+            "Renamed:\n"
+            + "\n".join(
+                [
+                    "`{}`  **to**  `{}`".format(deleted_command, added_command)
+                    for deleted_command, added_command in zip(
+                        deleted_commands, added_commands
+                    )
+                ]
+            )
+        )
 
 
 def register(bot):
