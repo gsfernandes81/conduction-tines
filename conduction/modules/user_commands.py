@@ -26,6 +26,12 @@ from ..bot import UserCommandBot
 # TODO
 # define a rename command
 
+NOTE_ABOUT_SLOW_DISCORD_PROPAGATION = (
+    "\nNote:\n"
+    + "Discord propagates command changes slowly so it may take a few minutes for "
+    + "changes to take effect."
+)
+
 
 @lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
 @lb.command(
@@ -170,23 +176,42 @@ async def add_command(
 
 
 @command_group.child
+@lb.option(
+    "delete_whole_group",
+    "USE WITH CAUTION, DELETES ALL SUBCOMMANDS",
+    bool,
+    default=False,
+)
 @layer_options(autocomplete=True)
 @lb.command("delete", "Delete a command", pass_options=True, inherit_checks=True)
 @lb.implements(lb.SlashSubCommand)
-async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str):
+async def delete_command(
+    ctx: lb.Context,
+    layer1: str,
+    layer2: str,
+    layer3: str,
+    delete_whole_group: bool = False,
+):
     # Manually defer
     await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     bot: UserCommandBot = ctx.bot
 
     try:
         # Delete the command and sync
-        deleted_command = await UserCommand.delete_command(layer1, layer2, layer3)
+        if delete_whole_group:
+            deleted_commands = await UserCommand.delete_command_group(
+                layer1, layer2, cascade=True
+            )
+        else:
+            deleted_commands = (
+                await UserCommand.delete_command(layer1, layer2, layer3),
+            ) or await UserCommand.delete_command_group(layer1, layer2, layer3)
         await bot.sync_application_commands()
     except Exception as e:
         # If an exception occurs, respond with it as a message
         logging.error(e)
         await ctx.respond(
-            "An error occured deleting the `{}` commmand.".format(
+            "An error occured deleting the `{}` commmand or group.".format(
                 " -> ".join(
                     [layer for layer in [layer1, layer2, layer3] if layer != ""]
                 )
@@ -197,11 +222,16 @@ async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str)
         )
     else:
         # Otherwise confirm success
-        if deleted_command:
-            await ctx.respond(f"Deleted the `{deleted_command}` command")
+        if deleted_commands:
+            await ctx.respond(
+                "Deleted the following command(s):\n```"
+                + "\n".join(str(cmd) for cmd in deleted_commands)
+                + "\n```"
+                + NOTE_ABOUT_SLOW_DISCORD_PROPAGATION
+            )
         else:
             await ctx.respond(
-                "`{}` command not found".format(
+                "`{}` command or group not found".format(
                     " -> ".join(
                         [layer for layer in [layer1, layer2, layer3] if layer != ""]
                     )
@@ -346,6 +376,7 @@ async def rename_command_or_group(
                     )
                 ]
             )
+            + NOTE_ABOUT_SLOW_DISCORD_PROPAGATION
         )
 
 
