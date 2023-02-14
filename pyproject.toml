@@ -9,7 +9,7 @@ packages = [{ include = "conduction" }]
 
 [tool.poetry.dependencies]
 asyncmy = "^0.2.7rc6"
-hikari = "2.0.0.dev115"
+hikari = "2.0.0.dev116"
 hikari-lightbulb = { version = "^2.3.1", extras = ["crontrigger"] }
 honcho = "^1.1.0"
 python = "~3.11.1"
