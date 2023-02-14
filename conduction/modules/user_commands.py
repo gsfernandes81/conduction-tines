@@ -197,7 +197,16 @@ async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str)
         )
     else:
         # Otherwise confirm success
-        await ctx.respond(f"Deleted the `{deleted_command}` command")
+        if deleted_command:
+            await ctx.respond(f"Deleted the `{deleted_command}` command")
+        else:
+            await ctx.respond(
+                "`{}` command not found".format(
+                    " -> ".join(
+                        [layer for layer in [layer1, layer2, layer3] if layer != ""]
+                    )
+                )
+            )
 
 
 @command_group.child
