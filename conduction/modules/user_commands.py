@@ -24,11 +24,16 @@ from ..schemas import UserCommand
 from ..bot import UserCommandBot
 
 # TODO
-# set up cfg.control_server
 # define a rename command
 
 
-@lb.command("command", "Custom command control")
+@lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
+@lb.command(
+    "command",
+    "Custom command control",
+    guilds=(cfg.control_discord_server_id,),
+    inherit_checks=True,
+)
 @lb.implements(lb.SlashCommandGroup)
 def command_group(ctx: lb.Context):
     pass
@@ -134,7 +139,9 @@ def schema_options(type_needed, description_needed):
 @command_group.child
 @schema_options(type_needed=True, description_needed=True)
 @layer_options(autocomplete=False)
-@lb.command("add", "Add a command", pass_options=True, auto_defer=True)
+@lb.command(
+    "add", "Add a command", pass_options=True, auto_defer=True, inherit_checks=True
+)
 @lb.implements(lb.SlashSubCommand)
 async def add_command(
     ctx: lb.Context,
@@ -161,7 +168,13 @@ async def add_command(
 
 @command_group.child
 @layer_options(autocomplete=True)
-@lb.command("delete", "Delete a command", pass_options=True, auto_defer=True)
+@lb.command(
+    "delete",
+    "Delete a command",
+    pass_options=True,
+    auto_defer=True,
+    inherit_checks=True,
+)
 @lb.implements(lb.SlashSubCommand)
 async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str):
     bot: UserCommandBot = ctx.bot
@@ -191,7 +204,9 @@ async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str)
 @command_group.child
 @schema_options(type_needed=False, description_needed=False)
 @layer_options(autocomplete=True)
-@lb.command("edit", "Edit a command", pass_options=True, auto_defer=True)
+@lb.command(
+    "edit", "Edit a command", pass_options=True, auto_defer=True, inherit_checks=True
+)
 @lb.implements(lb.SlashSubCommand)
 async def edit_command(
     ctx: lb.Context,
@@ -209,11 +224,7 @@ async def edit_command(
     deleted_command = await UserCommand.delete_command(layer1, layer2, layer3)
 
     # Update command parameters if specified
-    ln_names = (
-        [layer1, layer2, layer3]
-        if layer1 + layer2 + layer3
-        else deleted_command.ln_names
-    )
+    ln_names = deleted_command.ln_names
     description = description if description else deleted_command.description
     type = type if type else deleted_command.response_type
     response = response if response else deleted_command.response_data
