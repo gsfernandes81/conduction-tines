@@ -253,6 +253,24 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
+    async def _autocomplete(
+        cls, l1_name="", l2_name="", l3_name="", session=None
+    ) -> List[List[str]]:
+        completions = (
+            await session.execute(
+                select(cls).where(
+                    (cls.l1_name + cls.l2_name + cls.l3_name).startswith(
+                        l1_name + l2_name + l3_name
+                    )
+                )
+            )
+        ).fetchall()
+        completions = [] if not completions else completions
+        completions = [completion[0] for completion in completions]
+        return completions
+
+    @classmethod
+    @utils.ensure_session(db_session)
     async def add_command(
         cls,
         *ln_names,  # Layer n names
