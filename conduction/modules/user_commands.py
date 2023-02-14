@@ -111,6 +111,8 @@ def schema_options(type_needed, description_needed, command_groups_allowed=False
             h.CommandChoice(name="Message Copy", value=2),
             h.CommandChoice(name="Embed", value=3),
         ]
+        if command_groups_allowed:
+            choices.append(h.CommandChoice(name="Command Group", value=0))
         if type_needed:
             choices = choices[1:]
             default = h.UNDEFINED
