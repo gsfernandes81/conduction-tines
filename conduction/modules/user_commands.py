@@ -139,9 +139,7 @@ def schema_options(type_needed, description_needed):
 @command_group.child
 @schema_options(type_needed=True, description_needed=True)
 @layer_options(autocomplete=False)
-@lb.command(
-    "add", "Add a command", pass_options=True, auto_defer=True, inherit_checks=True
-)
+@lb.command("add", "Add a command", pass_options=True, inherit_checks=True)
 @lb.implements(lb.SlashSubCommand)
 async def add_command(
     ctx: lb.Context,
@@ -152,6 +150,9 @@ async def add_command(
     type: int,
     response: str,
 ):
+    # Manually defer
+    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
+
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
@@ -168,15 +169,11 @@ async def add_command(
 
 @command_group.child
 @layer_options(autocomplete=True)
-@lb.command(
-    "delete",
-    "Delete a command",
-    pass_options=True,
-    auto_defer=True,
-    inherit_checks=True,
-)
+@lb.command("delete", "Delete a command", pass_options=True, inherit_checks=True)
 @lb.implements(lb.SlashSubCommand)
 async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str):
+    # Manually defer
+    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     bot: UserCommandBot = ctx.bot
 
     try:
@@ -204,9 +201,7 @@ async def delete_command(ctx: lb.Context, layer1: str, layer2: str, layer3: str)
 @command_group.child
 @schema_options(type_needed=False, description_needed=False)
 @layer_options(autocomplete=True)
-@lb.command(
-    "edit", "Edit a command", pass_options=True, auto_defer=True, inherit_checks=True
-)
+@lb.command("edit", "Edit a command", pass_options=True, inherit_checks=True)
 @lb.implements(lb.SlashSubCommand)
 async def edit_command(
     ctx: lb.Context,
@@ -217,6 +212,8 @@ async def edit_command(
     type: int,
     response: str,
 ):
+    # Manually defer
+    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
