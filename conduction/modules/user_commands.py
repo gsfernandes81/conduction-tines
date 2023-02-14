@@ -23,6 +23,8 @@ from .. import cfg
 from ..schemas import UserCommand, db_session
 from ..bot import UserCommandBot
 
+# TODO
+# Add a way to try a command response
 
 NOTE_ABOUT_SLOW_DISCORD_PROPAGATION = (
     "\nNote:\n"
@@ -121,7 +123,7 @@ def schema_options(type_needed, description_needed, command_groups_allowed=False
             choices = choices[1:]
             default = h.UNDEFINED
         else:
-            default = choices[0]
+            default = -1
         return lb.option("response", "Respond to the user with this data", default="")(
             lb.option(
                 "type",
@@ -162,15 +164,38 @@ async def add_command(
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
-    await UserCommand.add_command(
-        layer1,
-        layer2,
-        layer3,
-        description=description,
-        response_type=type,
-        response_data=response,
-    )
-    await bot.sync_application_commands()
+    try:
+        async with db_session() as session:
+            async with session.begin():
+                await UserCommand.add_command(
+                    layer1,
+                    layer2,
+                    layer3,
+                    description=description,
+                    response_type=type,
+                    response_data=response,
+                    session=session,
+                )
+                await bot.sync_application_commands(session=session)
+    except Exception as e:
+        logging.exception(e)
+        await ctx.respond(
+            "An error occured adding the `{}` commmand or group.".format(
+                " -> ".join(
+                    [layer for layer in [layer1, layer2, layer3] if layer != ""]
+                )
+            )
+            + "\n\n Error trace:\n```"
+            + "\n".join(tb.format_exception(e))
+            + "\n```"
+        )
+    else:
+        await ctx.respond(
+            "Successfully added the `"
+            + " -> ".join([layer for layer in [layer1, layer2, layer3] if layer != ""])
+            + "` command.\n"
+            + NOTE_ABOUT_SLOW_DISCORD_PROPAGATION
+        )
 
 
 @command_group.child
@@ -207,7 +232,7 @@ async def delete_command(
         await bot.sync_application_commands()
     except Exception as e:
         # If an exception occurs, respond with it as a message
-        logging.error(e)
+        logging.exception(e)
         await ctx.respond(
             "An error occured deleting the `{}` commmand or group.".format(
                 " -> ".join(
@@ -256,25 +281,52 @@ async def edit_command(
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
-    # Delete subject command from db
-    deleted_command = await UserCommand.delete_command(layer1, layer2, layer3)
+    try:
+        async with db_session() as session:
+            async with session.begin():
+                # Delete subject command from db
+                deleted_command = await UserCommand.delete_command(
+                    layer1, layer2, layer3, session=session
+                )
 
-    # Update command parameters if specified
-    ln_names = deleted_command.ln_names
-    description = description if description else deleted_command.description
-    type = type if type else deleted_command.response_type
-    response = response if response else deleted_command.response_data
+                # Update command parameters if specified
+                ln_names = deleted_command.ln_names
+                description = (
+                    description if description else deleted_command.description
+                )
+                type = type if type != -1 else deleted_command.response_type
+                response = response if response else deleted_command.response_data
 
-    # Add command back with new parameters
-    await UserCommand.add_command(
-        *ln_names,
-        description=description,
-        response_type=type,
-        response_data=response,
-    )
+                # Add command back with new parameters
+                await UserCommand.add_command(
+                    *ln_names,
+                    description=description,
+                    response_type=type,
+                    response_data=response,
+                    session=session
+                )
 
-    # Resync with discord
-    await bot.sync_application_commands()
+                # Resync with discord
+                await bot.sync_application_commands(session=session)
+    except Exception as e:
+        logging.exception(e)
+        await ctx.respond(
+            "An error occured adding the `{}` commmand or group.".format(
+                " -> ".join(
+                    [layer for layer in [layer1, layer2, layer3] if layer != ""]
+                )
+            )
+            + "\n\n Error trace:\n```"
+            + "\n".join(tb.format_exception(e))
+            + "\n```"
+        )
+    else:
+        await ctx.respond(
+            "Successfully edited the `"
+            + " -> ".join([layer for layer in [layer1, layer2, layer3] if layer != ""])
+            + "` command.\n"
+            + NOTE_ABOUT_SLOW_DISCORD_PROPAGATION
+        )
 
 
 @command_group.child
@@ -343,7 +395,7 @@ async def rename_command_or_group(
                 await bot.sync_application_commands(session=session)
     except Exception as e:
         # If an exception occurs, respond with it as a message
-        logging.error(e)
+        logging.exception(e)
         await ctx.respond(
             "An error occured renaming the `{}` to `{}`.".format(
                 " -> ".join(
