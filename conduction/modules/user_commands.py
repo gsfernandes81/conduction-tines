@@ -23,8 +23,6 @@ from .. import cfg
 from ..schemas import UserCommand, db_session
 from ..bot import UserCommandBot
 
-# TODO
-# define a rename command
 
 NOTE_ABOUT_SLOW_DISCORD_PROPAGATION = (
     "\nNote:\n"
@@ -341,9 +339,8 @@ async def rename_command_or_group(
                         )
                     )
 
-        # Resync with discord
-        # Note: Consider reusing the above session for this
-        await bot.sync_application_commands()
+                # Resync with discord
+                await bot.sync_application_commands(session=session)
     except Exception as e:
         # If an exception occurs, respond with it as a message
         logging.error(e)

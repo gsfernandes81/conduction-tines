@@ -171,7 +171,8 @@ class UserCommandBot(lb.BotApp):
 
         return command_group
 
-    async def sync_schema_to_bot_cmds(self):
+    @utils.ensure_session(schemas.db_session)
+    async def sync_schema_to_bot_cmds(self, session=None):
         """Sync commands from schema in db to the bot"""
 
         # Remove all commands and command groups that are schema based
@@ -180,10 +181,9 @@ class UserCommandBot(lb.BotApp):
             if isinstance(command, SchemaBackedCommand):
                 self.remove_command(command)
 
-        schema_commands = (
-            await self._user_command_schema.fetch_command_groups()
-            + await self._user_command_schema.fetch_commands()
-        )
+        schema_commands = await self._user_command_schema.fetch_command_groups(
+            session=session
+        ) + await self._user_command_schema.fetch_commands(session=session)
 
         for cmd in schema_commands:
             if not self.is_existing_command(cmd.l1_name, cmd.l2_name, cmd.l3_name):
@@ -195,8 +195,9 @@ class UserCommandBot(lb.BotApp):
         Effectively an alias of the sync_application_commands method"""
         await super().sync_application_commands()
 
-    async def sync_application_commands(self) -> None:
-        await self.sync_schema_to_bot_cmds()
+    @utils.ensure_session(schemas.db_session)
+    async def sync_application_commands(self, session=None) -> None:
+        await self.sync_schema_to_bot_cmds(session=session)
         await self.sync_bot_cmds_to_discord()
 
     def command(
