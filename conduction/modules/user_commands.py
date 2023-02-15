@@ -107,7 +107,12 @@ def layer_options(autocomplete: bool, postfix: str = ""):
     return decorator_actual
 
 
-def schema_options(type_needed, description_needed, command_groups_allowed=False):
+def schema_options(
+    type_needed,
+    description_needed,
+    command_groups_allowed=False,
+    include_description=True,
+):
     """Decorator to add non layer schema options to commands"""
 
     def decorator_actual(func):
@@ -124,24 +129,88 @@ def schema_options(type_needed, description_needed, command_groups_allowed=False
             default = h.UNDEFINED
         else:
             default = -1
-        return lb.option("response", "Respond to the user with this data", default="")(
-            lb.option(
-                "type",
-                "Type of response to show the user",
-                choices=choices,
-                default=default,
-                type=int,
-            )(
-                lb.option(
-                    "description",
-                    "Description of the command",
-                    default="",
-                    required=description_needed,
-                )(func)
-            )
+
+        if include_description:
+            func = lb.option(
+                "description",
+                "Description of the command",
+                default="",
+                required=description_needed,
+            )(func)
+
+        func = lb.option(
+            "type",
+            "Type of response to show the user",
+            choices=choices,
+            default=default,
+            type=int,
+        )(func)
+
+        func = lb.option("response", "Respond to the user with this data", default="")(
+            func
         )
 
+        return func
+
     return decorator_actual
+
+
+@command_group.child
+@schema_options(
+    type_needed=True,
+    description_needed=False,
+    command_groups_allowed=False,
+    include_description=False,
+)
+@lb.command(
+    "preview",
+    "Preview a command response prior to adding it",
+    pass_options=True,
+    inherit_checks=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def preview_command(
+    ctx: lb.Context,
+    type: int,
+    response: str,
+):
+    # Manually defer
+    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
+
+    bot: UserCommandBot = ctx.bot
+    type: int = int(type)
+
+    try:
+        cmd = UserCommand(
+            "temp1",
+            "temp2",
+            "temp3",
+            description="temp cmd preview",
+            response_type=type,
+            response_data=response,
+        )
+        response_func = bot._user_command_response_func_builder(cmd)
+        await response_func.callback(ctx)
+
+    except Exception as e:
+        logging.exception(e)
+        await ctx.respond(
+            "An error occured while previewing the commmand."
+            + "\n\n Error trace:\n```"
+            + "\n".join(tb.format_exception(e))
+            + "\n\n```"
+            + "Raw response data:\n```\n"
+            + response
+            + "\n```"
+        )
+    else:
+        await ctx.respond(
+            "Preview generated.\nIf no response is visible then please contact"
+            + f" <@{(await bot.fetch_owner_ids())[0]}>.\n\n"
+            + "Raw response data:\n```\n"
+            + response
+            + "\n```"
+        )
 
 
 @command_group.child
@@ -303,7 +372,7 @@ async def edit_command(
                     description=description,
                     response_type=type,
                     response_data=response,
-                    session=session
+                    session=session,
                 )
 
                 # Resync with discord
