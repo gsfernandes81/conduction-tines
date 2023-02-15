@@ -286,7 +286,7 @@ class UserCommand(Base):
         existing_command = await cls.fetch_command(*ln_names, session=session)
         if existing_command:
             raise utils.FriendlyValueError(
-                f"Command {' -> '.join(filter(lambda n: n is not None, ln_names))} already exists"
+                f"Command {' -> '.join(filter(lambda n: n != '', ln_names))} already exists"
             )
 
         self = cls(

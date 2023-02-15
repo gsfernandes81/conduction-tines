@@ -19,7 +19,7 @@ import lightbulb as lb
 import typing as t
 import traceback as tb
 
-from .. import cfg
+from .. import cfg, utils
 from ..schemas import UserCommand, db_session
 from ..bot import UserCommandBot
 
@@ -198,8 +198,13 @@ async def preview_command(
             "An error occured while previewing the commmand."
             + "\n\n Error trace:\n```"
             + "\n".join(tb.format_exception(e))
-            + "\n\n```"
-            + "Raw response data:\n```\n"
+            + "\n```"
+            + (
+                ("\nError message:\n" + "\n".join(e.args) + "\n")
+                if isinstance(e, utils.FriendlyValueError)
+                else ""
+            )
+            + "\nRaw response data:\n```\n"
             + response
             + "\n```"
         )
@@ -248,13 +253,20 @@ async def add_command(
                 await bot.sync_application_commands(session=session)
     except Exception as e:
         logging.exception(e)
+        if isinstance(e, utils.FriendlyValueError):
+            error_msg_if_applicable = "\n".join(e.args)
         await ctx.respond(
-            "An error occured adding the `{}` commmand or group.".format(
+            "An error occured adding the `{}` commmand or group.\n".format(
                 " -> ".join(
                     [layer for layer in [layer1, layer2, layer3] if layer != ""]
                 )
             )
-            + "\n\n Error trace:\n```"
+            + (
+                ("\nError message:\n" + "\n".join(e.args) + "\n")
+                if isinstance(e, utils.FriendlyValueError)
+                else ""
+            )
+            + "\n Error trace:\n```"
             + "\n".join(tb.format_exception(e))
             + "\n```"
         )
@@ -303,12 +315,17 @@ async def delete_command(
         # If an exception occurs, respond with it as a message
         logging.exception(e)
         await ctx.respond(
-            "An error occured deleting the `{}` commmand or group.".format(
+            "An error occured deleting the `{}` commmand or group.\n".format(
                 " -> ".join(
                     [layer for layer in [layer1, layer2, layer3] if layer != ""]
                 )
             )
-            + "\n\n Error trace:\n```"
+            + (
+                ("\nError message:\n" + "\n".join(e.args) + "\n")
+                if isinstance(e, utils.FriendlyValueError)
+                else ""
+            )
+            + "\n Error trace:\n```"
             + "\n".join(tb.format_exception(e))
             + "\n```"
         )
@@ -380,12 +397,17 @@ async def edit_command(
     except Exception as e:
         logging.exception(e)
         await ctx.respond(
-            "An error occured adding the `{}` commmand or group.".format(
+            "An error occured adding the `{}` commmand or group.\n".format(
                 " -> ".join(
                     [layer for layer in [layer1, layer2, layer3] if layer != ""]
                 )
             )
-            + "\n\n Error trace:\n```"
+            + (
+                ("\nError message:\n" + "\n".join(e.args) + "\n")
+                if isinstance(e, utils.FriendlyValueError)
+                else ""
+            )
+            + "\n Error trace:\n```"
             + "\n".join(tb.format_exception(e))
             + "\n```"
         )
@@ -466,7 +488,7 @@ async def rename_command_or_group(
         # If an exception occurs, respond with it as a message
         logging.exception(e)
         await ctx.respond(
-            "An error occured renaming the `{}` to `{}`.".format(
+            "An error occured renaming the `{}` to `{}`.\n".format(
                 " -> ".join(
                     [layer for layer in [layer1, layer2, layer3] if layer != ""]
                 ),
@@ -478,7 +500,10 @@ async def rename_command_or_group(
                     ]
                 ),
             )
-            + "\n\n Error trace:\n```"
+            + ("\nError message:\n" + "\n".join(e.args) + "\n")
+            if isinstance(e, utils.FriendlyValueError)
+            else ""
+            + "\n Error trace:\n```"
             + "\n".join(tb.format_exception(e))
             + "\n```"
         )
