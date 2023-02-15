@@ -16,17 +16,23 @@
 import hikari as h
 from lightbulb.ext import tasks
 
-from . import cfg
-from .bot import CachedFetchBot
-from .modules import repeater, lost_sector, weekly_reset, xur
+from . import cfg, schemas
+from .bot import CachedFetchBot, UserCommandBot
+from .modules import repeater, lost_sector, weekly_reset, xur, user_commands
 
-bot = CachedFetchBot(**cfg.lightbulb_params)
+
+class Bot(UserCommandBot, CachedFetchBot):
+    pass
+
+
+bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
 
 for module in [
     repeater,
     lost_sector,
     weekly_reset,
     xur,
+    user_commands,
 ]:
     module.register(bot)
 
