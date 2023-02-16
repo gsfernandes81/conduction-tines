@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+from collections import defaultdict
 from typing import List
 
 import regex as re
@@ -24,9 +25,9 @@ from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, validates
 from sqlalchemy.sql.expression import and_, delete, select, update
-from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
-from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Integer, String, Text, Boolean
 from sqlalchemy.sql.functions import func
+from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
+from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Integer, String, Text
 
 from . import cfg, utils
 
@@ -44,6 +45,11 @@ rgx_sub_cmd_name_is_valid = re.compile("^[a-z]{0,1}[a-z0-9_-]{0,31}$")
 
 
 class MirroredChannel(Base):
+    """Cache enabled mirror channels model
+
+    Cache only implemented for fetches with src_id for legacy mirrors
+    with the get_dests method and invalidated on additions and deletions"""
+
     __tablename__ = "mirrored_channel"
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (UniqueConstraint("src_id", "dest_id", name="_mir_ids_uc"),)
@@ -51,6 +57,7 @@ class MirroredChannel(Base):
     src_id = Column("src_id", BigInteger)
     dest_id = Column("dest_id", BigInteger)
     legacy = Column("legacy", Boolean)
+    _dests_cache = defaultdict(list)
 
     def __init__(self, src_id: int, dest_id: int, legacy: bool):
         super().__init__()
@@ -60,7 +67,9 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_dests(cls, src_id: int, legacy: bool | None = True, session=None):
+    async def fetch_dests(
+        cls, src_id: int, legacy: bool | None = True, session=None
+    ) -> List[MirroredChannel]:
         dests = (
             await session.execute(
                 select(cls).where(
@@ -77,7 +86,19 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_srcs(cls, dest_id: int, legacy: bool | None = True, session=None):
+    async def get_or_fetch_dests(cls, src_id: int, session=None) -> List[int]:
+        if cls._dests_cache[src_id]:
+            return cls._dests_cache[src_id]
+        else:
+            dests = await cls.fetch_dests(src_id, session=session)
+            cls._dests_cache[src_id] = dests
+            return dests
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_srcs(
+        cls, dest_id: int, legacy: bool | None = True, session=None
+    ) -> List[MirroredChannel]:
         srcs = (
             await session.execute(
                 select(cls).where(
@@ -96,7 +117,7 @@ class MirroredChannel(Base):
     @utils.ensure_session(db_session)
     async def count_dests(
         cls, src_id: int, legacy_only: bool | None = True, session=None
-    ):
+    ) -> int:
         dests_count = (
             await session.execute(
                 select(func.count())
@@ -116,30 +137,46 @@ class MirroredChannel(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def add_mirror(cls, src_id: int, dest_id: int, legacy: bool, session=None):
-        return session.add(cls(src_id, dest_id, legacy))
+        session.add(cls(src_id, dest_id, legacy))
+        if legacy and dest_id not in cls._dests_cache[src_id]:
+            cls._dests_cache[src_id].append(dest_id)
 
     @classmethod
     @utils.ensure_session(db_session)
     async def set_legacy(
         cls, src_id: int, dest_id: int, legacy: bool = True, session=None
-    ):
-        return await session.execute(
+    ) -> None:
+        await session.execute(
             update(cls)
             .where(and_(cls.src_id == src_id, cls.dest_id == dest_id))
             .values(legacy=legacy)
         )
+        if legacy:
+            cls._dests_cache[src_id].append(dest_id)
+        else:
+            cls._dests_cache[src_id].remove(dest_id)
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def remove_mirror(cls, src_id: int, dest_id: int, session=None):
-        return await session.execute(
+    async def remove_mirror(cls, src_id: int, dest_id: int, session=None) -> None:
+        await session.execute(
             delete(cls).where(and_(cls.src_id == src_id, cls.dest_id == dest_id))
         )
+        try:
+            cls._dests_cache[src_id].remove(dest_id)
+        except ValueError:
+            pass
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def remove_all_mirrors(cls, dest_id: int, session=None):
-        return await session.execute(delete(cls).where(and_(cls.dest_id == dest_id)))
+    async def remove_all_mirrors(cls, dest_id: int, session=None) -> None:
+        src_ids = await cls.fetch_srcs(dest_id)
+        await session.execute(delete(cls).where(and_(cls.dest_id == dest_id)))
+        for src_id in src_ids:
+            try:
+                cls._dests_cache[src_id].remove(dest_id)
+            except ValueError:
+                pass
 
 
 class MirroredMessage(Base):

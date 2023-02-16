@@ -51,6 +51,9 @@ async def test_add_and_fetch_mirror():
             assert [dest_id] == await MirroredChannel.fetch_dests(
                 src_id, session=session
             )
+            assert [dest_id] == await MirroredChannel.get_or_fetch_dests(
+                src_id, session=session
+            )
             assert [] == await MirroredChannel.fetch_dests(
                 src_id, legacy=False, session=session
             )
@@ -72,6 +75,9 @@ async def test_add_and_fetch_mirror():
             assert [dest_id] == await MirroredChannel.fetch_dests(
                 src_id, session=session
             )
+            assert [dest_id] == await MirroredChannel.get_or_fetch_dests(
+                src_id, session=session
+            )
             assert [dest_id_2] == await MirroredChannel.fetch_dests(
                 src_id, legacy=False, session=session
             )
@@ -88,9 +94,11 @@ async def test_remove_mirror():
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id_2)
     assert [dest_id, dest_id_2] == await MirroredChannel.fetch_dests(src_id)
+    assert [dest_id, dest_id_2] == await MirroredChannel.get_or_fetch_dests(src_id)
 
     await MirroredChannel.remove_mirror(src_id, dest_id)
     assert dest_id not in await MirroredChannel.fetch_dests(src_id)
+    assert dest_id not in await MirroredChannel.get_or_fetch_dests(src_id)
 
 
 @pytest.mark.asyncio
@@ -103,6 +111,8 @@ async def test_remove_all_mirrors():
     await MirroredChannel.add_mirror(src_id_2, dest_id, legacy=True)
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id_2)
+    assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
+    assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id_2)
     assert [src_id, src_id_2] == await MirroredChannel.fetch_srcs(dest_id)
 
     await MirroredChannel.remove_all_mirrors(dest_id)
@@ -116,12 +126,14 @@ async def test_add_duplicate_mirror():
 
     await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
+    assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
 
     with pytest.raises(sqlalchemy.exc.IntegrityError):
         await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
 
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
+    assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
 
 
