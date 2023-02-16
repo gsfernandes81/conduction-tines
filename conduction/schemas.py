@@ -23,9 +23,10 @@ import regex as re
 from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, validates
-from sqlalchemy.sql.expression import and_, delete, select
+from sqlalchemy.sql.expression import and_, delete, select, update
 from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
-from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Integer, String, Text
+from sqlalchemy.sql.sqltypes import BigInteger, DateTime, Integer, String, Text, Boolean
+from sqlalchemy.sql.functions import func
 
 from . import cfg, utils
 
@@ -40,6 +41,105 @@ rgx_sub_cmd_name_is_valid = re.compile("^[a-z]{0,1}[a-z0-9_-]{0,31}$")
 # that the sub command regex needs to allow blank strings to indicate and
 # match blanks for commands that aren't 3 layers deep (where the last and)
 # potentially the second last layer will be blank
+
+
+class MirroredChannel(Base):
+    __tablename__ = "mirrored_channel"
+    __mapper_args__ = {"eager_defaults": True}
+    __table_args__ = (UniqueConstraint("src_id", "dest_id", name="_mir_ids_uc"),)
+    db_id = Column("db_id", BigInteger, primary_key=True)
+    src_id = Column("src_id", BigInteger)
+    dest_id = Column("dest_id", BigInteger)
+    legacy = Column("legacy", Boolean)
+
+    def __init__(self, src_id: int, dest_id: int, legacy: bool):
+        super().__init__()
+        self.src_id = int(src_id)
+        self.dest_id = int(dest_id)
+        self.legacy = bool(legacy)
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_dests(cls, src_id: int, legacy: bool | None = True, session=None):
+        dests = (
+            await session.execute(
+                select(cls).where(
+                    and_(
+                        cls.src_id == src_id,
+                        (cls.legacy == legacy) if legacy is not None else True,
+                    )
+                )
+            )
+        ).fetchall()
+        dests = dests if dests else []
+        dests = [dest[0].dest_id for dest in dests]
+        return dests
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_srcs(cls, dest_id: int, legacy: bool | None = True, session=None):
+        srcs = (
+            await session.execute(
+                select(cls).where(
+                    and_(
+                        cls.dest_id == dest_id,
+                        (cls.legacy == legacy) if legacy is not None else True,
+                    )
+                )
+            )
+        ).fetchall()
+        srcs = srcs if srcs else []
+        srcs = [src[0].src_id for src in srcs]
+        return srcs
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def count_dests(
+        cls, src_id: int, legacy_only: bool | None = True, session=None
+    ):
+        dests_count = (
+            await session.execute(
+                select(func.count())
+                .select_from(cls)
+                .where(
+                    and_(
+                        cls.src_id == src_id,
+                        (cls.legacy == legacy_only)
+                        if legacy_only is not None
+                        else True,
+                    )
+                )
+            )
+        ).scalars()
+        return dests_count
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_mirror(cls, src_id: int, dest_id: int, legacy: bool, session=None):
+        return session.add(cls(src_id, dest_id, legacy))
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def set_legacy(
+        cls, src_id: int, dest_id: int, legacy: bool = True, session=None
+    ):
+        return await session.execute(
+            update(cls)
+            .where(and_(cls.src_id == src_id, cls.dest_id == dest_id))
+            .values(legacy=legacy)
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def remove_mirror(cls, src_id: int, dest_id: int, session=None):
+        return await session.execute(
+            delete(cls).where(and_(cls.src_id == src_id, cls.dest_id == dest_id))
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def remove_all_mirrors(cls, dest_id: int, session=None):
+        return await session.execute(delete(cls).where(and_(cls.dest_id == dest_id)))
 
 
 class MirroredMessage(Base):
