@@ -17,15 +17,14 @@ import logging
 
 import hikari as h
 
-from .. import cfg
-from ..schemas import MirroredMessage, db_session
+from ..schemas import MirroredChannel, MirroredMessage, db_session
 
 
 async def message_create_repeater(event: h.MessageCreateEvent):
     msg = event.message
     bot = event.app
 
-    mirrors = cfg.mirror_dict.get(msg.channel_id)
+    mirrors = await MirroredChannel.get_or_fetch_dests(msg.channel_id)
     if not mirrors:
         # Return if this channel is not to be mirrored
         # ie if no mirror list found for it
@@ -64,7 +63,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
     msg = event.message
     bot = event.app
 
-    if not cfg.mirror_dict.get(msg.channel_id):
+    if not await MirroredChannel.get_or_fetch_dests(msg.channel_id):
         # Return if this channel is not to be mirrored
         # ie if no mirror list found for it
         return

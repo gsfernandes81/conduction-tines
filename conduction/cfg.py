@@ -36,15 +36,6 @@ if test_env:
     lightbulb_params["default_enabled_guilds"] = test_env
 
 
-# Mirror dict
-mirror_dict = json.loads(_getenv("MIRROR_JSON"))
-# Convert all strings to ints in mirror dict
-_new_mirror_dict = {}
-for key, channel_list in mirror_dict.items():
-    _new_mirror_dict[int(key)] = [int(channel_id) for channel_id in channel_list]
-mirror_dict = _new_mirror_dict
-
-
 # DB config
 db_url = _getenv("MYSQL_URL")
 __repl_till = db_url.find("://")
