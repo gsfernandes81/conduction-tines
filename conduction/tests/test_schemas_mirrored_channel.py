@@ -16,18 +16,10 @@
 import asyncio
 
 import pytest
-from . import schemas
+from .. import schemas
 import sqlalchemy.exc
 
-from .schemas import MirroredChannel
-from .utils import get_function_name
-
-
-@pytest.fixture(scope="module")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+from ..schemas import MirroredChannel
 
 
 def setup_function():
