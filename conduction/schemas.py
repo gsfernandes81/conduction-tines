@@ -225,6 +225,10 @@ class MirroredMessage(Base):
         session=None,
     ):
         """Create a session, begin it and add a message pair"""
+        dest_msg = int(dest_msg)
+        dest_channel = int(dest_channel)
+        source_msg = int(source_msg)
+        source_channel = int(source_channel)
         message_pair = cls(dest_msg, dest_channel, source_msg, source_channel)
         session.add(message_pair)
         return message_pair
@@ -237,6 +241,7 @@ class MirroredMessage(Base):
         session=None,
     ):
         """Return dest message and channel ids from source message id"""
+        source_msg = int(source_msg)
         dest_msgs = (
             await session.execute(
                 select(cls.dest_msg, cls.dest_channel).where(
