@@ -53,9 +53,8 @@ class MirroredChannel(Base):
     __tablename__ = "mirrored_channel"
     __mapper_args__ = {"eager_defaults": True}
     __table_args__ = (UniqueConstraint("src_id", "dest_id", name="_mir_ids_uc"),)
-    db_id = Column("db_id", BigInteger, primary_key=True)
-    src_id = Column("src_id", BigInteger)
-    dest_id = Column("dest_id", BigInteger)
+    src_id = Column("src_id", BigInteger, primary_key=True)
+    dest_id = Column("dest_id", BigInteger, primary_key=True)
     legacy = Column("legacy", Boolean)
     _dests_cache = defaultdict(list)
 
@@ -64,6 +63,15 @@ class MirroredChannel(Base):
         self.src_id = int(src_id)
         self.dest_id = int(dest_id)
         self.legacy = bool(legacy)
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_mirror(cls, src_id: int, dest_id: int, legacy: bool, session=None):
+        src_id = int(src_id)
+        dest_id = int(dest_id)
+        await session.merge(cls(src_id, dest_id, legacy))
+        if legacy and dest_id not in cls._dests_cache[src_id]:
+            cls._dests_cache[src_id].append(dest_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -137,15 +145,6 @@ class MirroredChannel(Base):
             )
         ).scalars()
         return dests_count
-
-    @classmethod
-    @utils.ensure_session(db_session)
-    async def add_mirror(cls, src_id: int, dest_id: int, legacy: bool, session=None):
-        src_id = int(src_id)
-        dest_id = int(dest_id)
-        session.add(cls(src_id, dest_id, legacy))
-        if legacy and dest_id not in cls._dests_cache[src_id]:
-            cls._dests_cache[src_id].append(dest_id)
 
     @classmethod
     @utils.ensure_session(db_session)

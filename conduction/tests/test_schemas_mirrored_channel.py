@@ -17,7 +17,6 @@ import asyncio
 
 import pytest
 from .. import schemas
-import sqlalchemy.exc
 
 from ..schemas import MirroredChannel
 
@@ -121,6 +120,8 @@ async def test_remove_all_mirrors():
 
 @pytest.mark.asyncio
 async def test_add_duplicate_mirror():
+    # Note, this should not raise an error since
+    # add_mirror uses merge instead of add
     src_id = 0
     dest_id = 1
 
@@ -129,9 +130,10 @@ async def test_add_duplicate_mirror():
     assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
 
-    with pytest.raises(sqlalchemy.exc.IntegrityError):
-        await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
+    # Errors here indicate that there was an issue merging
+    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
 
+    # Duplicates here should not show up
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
     assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
