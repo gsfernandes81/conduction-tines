@@ -71,7 +71,7 @@ async def lost_sector_today_command(ctx: lb.Context):
                 + "\n"
                 + "ℹ️ : <https://lostsectortoday.com/>"
             ).format(**format_dict),
-            color=cfg.kyber_pink,
+            color=cfg.embed_default_color,
         ).set_image(ls_gfx_url),
         components=(
             bot.rest.build_message_action_row()
