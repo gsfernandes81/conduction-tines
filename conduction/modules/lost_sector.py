@@ -39,8 +39,15 @@ async def refresh_lost_sector_data():
     )
 
 
-@lb.command("lstoday", "Find out about today's lost sector")
-@lb.implements(lb.SlashCommand)
+@lb.command("ls", "Find out about today's lost sector")
+@lb.implements(lb.SlashCommandGroup)
+async def ls_group():
+    pass
+
+
+@ls_group.child
+@lb.command("today", "Find out about today's lost sector")
+@lb.implements(lb.SlashSubCommand)
 async def lost_sector_today_command(ctx: lb.Context):
     date = dt.datetime.now(tz=utc)
     sector = sector_on(date)
@@ -87,7 +94,7 @@ async def lost_sector_today_command(ctx: lb.Context):
 
 def register(bot: t.Union[CachedFetchBot, UserCommandBot]):
     for command in [
-        lost_sector_today_command,
+        ls_group,
     ]:
         bot.command(command)
 
