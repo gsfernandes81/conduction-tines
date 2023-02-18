@@ -33,7 +33,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
     logging.info(f"MessageCreateEvent received for messge in <#{msg.channel_id}>")
 
     if not h.MessageFlag.CROSSPOSTED in msg.flags:
-        logging.info("Message in <#{msg.channel_id}> not crossposted, waiting...")
+        logging.info(f"Message in <#{msg.channel_id}> not crossposted, waiting...")
         await bot.wait_for(
             h.MessageUpdateEvent,
             timeout=12 * 60 * 60,
@@ -41,7 +41,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
             and h.MessageFlag.CROSSPOSTED in e.message.flags,
         )
         logging.info(
-            "Crosspost event received for messge in in <#{msg.channel_id}>, "
+            f"Crosspost event received for messge in in <#{msg.channel_id}>, "
             + "continuing..."
         )
 
