@@ -30,6 +30,21 @@ async def message_create_repeater(event: h.MessageCreateEvent):
         # ie if no mirror list found for it
         return
 
+    logging.info(f"MessageCreateEvent received for messge in <#{msg.channel_id}>")
+
+    if not h.MessageFlag.CROSSPOSTED in msg.flags:
+        logging.info("Message in <#{msg.channel_id}> not crossposted, waiting...")
+        await bot.wait_for(
+            h.MessageUpdateEvent,
+            timeout=12 * 60 * 60,
+            predicate=lambda e: e.message.id == msg.id
+            and h.MessageFlag.CROSSPOSTED in e.message.flags,
+        )
+        logging.info(
+            "Crosspost event received for messge in in <#{msg.channel_id}>, "
+            + "continuing..."
+        )
+
     for mirror_ch_id in mirrors:
         channel: h.TextableChannel = await bot.fetch_channel(mirror_ch_id)
 
