@@ -17,6 +17,9 @@ import hikari as h
 import lightbulb as lb
 
 from .. import cfg, utils
+from .autoposts import autopost_command_group, follow_control_command_maker
+
+FOLLOWABLE_CHANNEL = cfg.followables["xur"]
 
 
 async def get_basic_xur_embed():
@@ -38,3 +41,7 @@ def register(bot):
         xur_command,
     ]:
         bot.command(command)
+
+    autopost_command_group.child(
+        follow_control_command_maker(FOLLOWABLE_CHANNEL, "xur", "Xur", "Xur auto posts")
+    )

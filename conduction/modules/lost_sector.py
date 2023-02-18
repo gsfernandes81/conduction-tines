@@ -14,7 +14,7 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import datetime as dt
-import sys
+import typing as t
 from calendar import month_name
 
 import hikari as h
@@ -24,6 +24,10 @@ from lightbulb.ext import tasks
 from pytz import utc
 
 from .. import cfg, utils
+from ..bot import CachedFetchBot, UserCommandBot
+from .autoposts import autopost_command_group, follow_control_command_maker
+
+FOLLOWABLE_CHANNEL = cfg.followables["lost_sector"]
 
 
 @tasks.task(s=30, auto_start=True, wait_before_execution=False)
@@ -81,8 +85,14 @@ async def lost_sector_today_command(ctx: lb.Context):
     )
 
 
-def register(bot):
+def register(bot: t.Union[CachedFetchBot, UserCommandBot]):
     for command in [
         lost_sector_today_command,
     ]:
         bot.command(command)
+
+    autopost_command_group.child(
+        follow_control_command_maker(
+            FOLLOWABLE_CHANNEL, "lost_sector", "Lost sector", "Lost sector auto posts"
+        )
+    )

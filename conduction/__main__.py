@@ -18,7 +18,7 @@ from lightbulb.ext import tasks
 
 from . import cfg, schemas
 from .bot import CachedFetchBot, UserCommandBot
-from .modules import repeater, lost_sector, weekly_reset, xur, user_commands
+from .modules import autoposts, lost_sector, repeater, user_commands, weekly_reset, xur
 
 
 class Bot(UserCommandBot, CachedFetchBot):
@@ -28,6 +28,7 @@ class Bot(UserCommandBot, CachedFetchBot):
 bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
 
 for module in [
+    autoposts,
     repeater,
     lost_sector,
     weekly_reset,
