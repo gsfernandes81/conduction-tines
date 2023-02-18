@@ -38,6 +38,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
             h.MessageUpdateEvent,
             timeout=12 * 60 * 60,
             predicate=lambda e: e.message.id == msg.id
+            and e.message.flags
             and h.MessageFlag.CROSSPOSTED in e.message.flags,
         )
         logging.info(
