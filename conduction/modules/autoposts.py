@@ -140,25 +140,34 @@ def follow_control_command_maker(
                 # permissions
                 bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[0])
                 await ctx.respond(
-                    "The bot is missing permissions in this channel.\n"
-                    + "Please make sure it has the following permissions:"
-                    + "```\n"
-                    + "- View Channel\n"
-                    + "- Manage Webhooks\n"
-                    + "- Send Messages\n"
-                    + "```\n"
-                    + "If you are still having issues, please contact "
-                    + f"{bot_owner.username}#{bot_owner.discriminator}"
+                    h.Embed(
+                        title="Missing Permissions",
+                        description="The bot is missing permissions in this channel.\n"
+                        + "Please make sure it has the following permissions:"
+                        + "```\n"
+                        + "- View Channel\n"
+                        + "- Manage Webhooks\n"
+                        + "- Send Messages\n"
+                        + "```\n"
+                        + "If you are still having issues, please contact "
+                        + f"**{bot_owner.username}#{bot_owner.discriminator}**",
+                        color=cfg.embed_default_color,
+                    )
                 )
             raise e
         except Exception as e:
             error_reference = randint(1000000, 9999999)
             bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[0])
             await ctx.respond(
-                "An error occurred while trying to update autopost settings.\n"
-                + "Please contact "
-                + f"{bot_owner.username}#{bot_owner.discriminator}"
-                + f" with the error reference `{error_reference}`"
+                h.Embed(
+                    title="Pardon our dust!",
+                    description="An error occurred while trying to update autopost settings. "
+                    + "Please contact "
+                    + f"**{bot_owner.username}#{bot_owner.discriminator}** with the "
+                    + f"error reference `{error_reference}` and we will fix this "
+                    + "for you.",
+                    color=cfg.embed_default_color,
+                )
             )
             await (await bot.fetch_channel(cfg.log_channel)).send(
                 f"Exception with error reference `{error_reference}`:\n```"
@@ -169,9 +178,12 @@ def follow_control_command_maker(
             raise e
         else:
             await ctx.respond(
-                f"Autoposts for {autoposts_friendly_name} have been "
-                + ("enabled" if option else "disabled")
-                + "!"
+                h.Embed(
+                    title=f"{autoposts_friendly_name} autoposts "
+                    + ("enabled" if option else "disabled")
+                    + "!",
+                    color=cfg.embed_default_color,
+                )
             )
 
     return follow_control
