@@ -21,7 +21,7 @@ from random import randint
 import hikari as h
 import lightbulb as lb
 
-from .. import utils, cfg
+from .. import cfg, utils
 from ..bot import CachedFetchBot, UserCommandBot
 from ..schemas import MirroredChannel, db_session
 
@@ -178,12 +178,7 @@ def follow_control_command_maker(
                     color=cfg.embed_default_color,
                 )
             )
-            await (await bot.fetch_channel(cfg.log_channel)).send(
-                f"Exception with error reference `{error_reference}`:\n```"
-                + "\n".join(tb.format_exception(e))
-                + "\n```"
-            )
-            logging.error(f"Error reference: {error_reference}")
+            await utils.discord_error_logger(bot, e, error_reference)
             raise e
         else:
             await ctx.respond(

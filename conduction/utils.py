@@ -15,9 +15,14 @@
 
 import inspect
 import logging
+import traceback as tb
 import typing as t
+from random import randint
 
 import aiohttp
+import hikari as h
+
+from . import cfg
 
 
 def ensure_session(sessionmaker):
@@ -83,3 +88,19 @@ def check_number_of_layers(
         )
     elif ln_name_length < min_layers:
         raise ValueError(f"Too few ln_names provided, need at least {min_layers}")
+
+
+async def discord_error_logger(
+    bot: h.GatewayBot, e: Exception, error_reference: int = None
+):
+    """Logs discord errors to the log channel and the console"""
+
+    if not error_reference:
+        error_reference = randint(1000000, 9999999)
+
+    await (await bot.fetch_channel(cfg.log_channel)).send(
+        f"Exception with error reference `{error_reference}`:\n```"
+        + "\n".join(tb.format_exception(e))
+        + "\n```"
+    )
+    logging.error(f"Error reference: {error_reference}")
