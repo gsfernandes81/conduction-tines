@@ -20,12 +20,13 @@ from . import cfg, schemas
 from .bot import CachedFetchBot, UserCommandBot
 from .modules import (
     autoposts,
+    eververse,
     lost_sector,
     repeater,
+    twab,
     user_commands,
     weekly_reset,
     xur,
-    eververse,
 )
 
 
@@ -39,6 +40,7 @@ for module in [
     autoposts,
     eververse,
     repeater,
+    twab,
     lost_sector,
     weekly_reset,
     xur,
