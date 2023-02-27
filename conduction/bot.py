@@ -267,6 +267,16 @@ class UserCommandBot(lb.BotApp):
 
             @decorator
             async def _responder(ctx: lb.Context):
-                await ctx.respond(h.Embed(**embed_kwargs))
+                try:
+                    image = embed_kwargs.pop("image")
+                except KeyError:
+                    image = None
+
+                embed = h.Embed(**embed_kwargs)
+
+                if image:
+                    embed.set_image(image)
+
+                await ctx.respond(embed)
 
         return _responder

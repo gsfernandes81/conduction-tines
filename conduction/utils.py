@@ -104,3 +104,10 @@ async def discord_error_logger(
         + "\n```"
     )
     logging.error(f"Error reference: {error_reference}")
+
+
+def accumulate(iterable):
+    final = iterable[0]
+    for arg in iterable[1:]:
+        final = final + arg
+    return final

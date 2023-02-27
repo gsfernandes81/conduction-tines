@@ -26,7 +26,7 @@ from ..bot import CachedFetchBot
 from .autoposts import autopost_command_group, follow_control_command_maker
 from . import autocmd
 
-FOLLOWABLE_CHANNEL = cfg.followables["weekly_reset"]
+FOLLOWABLE_CHANNEL = cfg.followables["eververse"]
 
 
 def weekly_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
@@ -39,60 +39,49 @@ def weekly_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
 
 
 @tasks.task(m=1, auto_start=True, wait_before_execution=False, pass_app=True)
-async def refresh_weekly_reset_data(bot: CachedFetchBot) -> None:
-    global weekly_reset_message_kwargs
+async def refresh_eververse_weekly_data(bot: CachedFetchBot) -> None:
+    global eververse_weekly_message_kwargs
 
     messages = await autocmd.pull_messages_from_channel(
         bot, after=weekly_reset_period()[0], channel_id=FOLLOWABLE_CHANNEL
     )
 
-    msg_proto = autocmd.MessagePrototype()
-    for message_no, message in enumerate(messages):
-        msg_proto = msg_proto + autocmd.MessagePrototype.from_message(message)
-
-    msg_proto.merge_content_into_embed()
-    msg_proto.merge_attachements_into_embed(designator=message_no)
-
-    weekly_reset_message_kwargs = msg_proto.to_message_kwargs()
-
-
-async def get_basic_weekly_reset_embed():
-    return h.Embed(
-        title="Weekly Reset",
-        url=await utils.follow_link_single_step("https://kyberscorner.com/"),
-        color=cfg.default_embed_color,
-    ).set_image("https://kyber3000.com/Reset")
-
-
-@lb.command("weekly", "Weekly reset")
-@lb.implements(lb.SlashCommandGroup)
-async def weekly_reset_command_group(ctx: lb.Context):
-    pass
-
-
-@weekly_reset_command_group.child
-@lb.command("reset", "Find out about this weeks reset")
-@lb.implements(lb.SlashSubCommand)
-async def weekly_reset_command(ctx: lb.Context):
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-
+    # Merge all the images into the last embed for each message
+    # and all the content into the first embed for each message
+    msg_protos: autocmd.MessagePrototype = []
     try:
-        await ctx.respond(**weekly_reset_message_kwargs)
-    except NameError:
-        await ctx.respond(await get_basic_weekly_reset_embed())
+        for message_no, message in enumerate(messages):
+            # Merge content into the first embed if it exists
+            # else make a new embed and do the same
+            msg_proto = autocmd.MessagePrototype.from_message(message)
+            msg_proto.merge_content_into_embed(0)
+            msg_proto.merge_attachements_into_embed(designator=message_no)
+            msg_protos.append(msg_proto)
+    except Exception as e:
+        utils.discord_error_logger(bot, e)
+        raise e
+
+    eververse_weekly_message_kwargs = utils.accumulate(msg_protos).to_message_kwargs()
+
+
+@lb.command("eververse", "Find out about this weeks reset")
+@lb.implements(lb.SlashCommand)
+async def eververse_weekly(ctx: lb.Context):
+    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
+    await ctx.respond(**eververse_weekly_message_kwargs)
 
 
 def register(bot):
     for command in [
-        weekly_reset_command_group,
+        eververse_weekly,
     ]:
         bot.command(command)
 
     autopost_command_group.child(
         follow_control_command_maker(
             FOLLOWABLE_CHANNEL,
-            "weekly_reset",
-            "Weekly reset",
-            "Weekly reset auto posts",
+            "eververse",
+            "Eververse",
+            "Eververse auto posts",
         )
     )

@@ -70,10 +70,10 @@ gsheets_credentials = {
 sheets_ls_url = _getenv("SHEETS_LS_URL")
 
 # Discord snowflakes & constants
-alerts_channel_id = int(_getenv("ALERTS_CHANNEL_ID"))
 embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
 control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
 control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
+default_url = str(_getenv("DEFAULT_URL"))
 followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 log_channel = int(_getenv("LOG_CHANNEL"))
 
