@@ -144,12 +144,17 @@ async def test_count_dests():
     src_id = 0
     src_id_2 = 1
     dest_id = 2
+    dest_id_2 = 3
 
+    assert 0 == await MirroredChannel.count_dests(src_id)
+    assert 0 == await MirroredChannel.count_dests(src_id_2)
     await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
     await MirroredChannel.add_mirror(src_id_2, dest_id, legacy=True)
-    assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
-    assert [dest_id] == await MirroredChannel.fetch_dests(src_id_2)
-    assert [src_id, src_id_2] == await MirroredChannel.fetch_srcs(dest_id)
-
-    await MirroredChannel.remove_all_mirrors(dest_id)
-    assert [] == await MirroredChannel.fetch_srcs(dest_id)
+    assert 1 == await MirroredChannel.count_dests(src_id)
+    assert 1 == await MirroredChannel.count_dests(src_id_2)
+    assert 0 == await MirroredChannel.count_dests(dest_id)
+    await MirroredChannel.add_mirror(src_id, dest_id_2, legacy=True)
+    assert 2 == await MirroredChannel.count_dests(src_id)
+    assert 1 == await MirroredChannel.count_dests(src_id_2)
+    assert 0 == await MirroredChannel.count_dests(dest_id)
+    assert 0 == await MirroredChannel.count_dests(dest_id_2)

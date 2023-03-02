@@ -143,7 +143,8 @@ class MirroredChannel(Base):
                     )
                 )
             )
-        ).scalars()
+        ).scalar_one()
+
         return dests_count
 
     @classmethod
