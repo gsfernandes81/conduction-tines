@@ -14,6 +14,7 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import hikari as h
+import lightbulb as lb
 from lightbulb.ext import tasks
 
 from . import cfg, schemas
@@ -35,6 +36,21 @@ class Bot(UserCommandBot, CachedFetchBot):
 
 
 bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
+
+
+@tasks.task(m=5, auto_start=True, wait_before_execution=False)
+async def autoupdate_status():
+    if not bot.d.has_lb_started:
+        await bot.wait_for(lb.LightbulbStartedEvent, timeout=None)
+        bot.d.has_lightbulb_started = True
+
+    await bot.update_presence(
+        activity=h.Activity(
+            name="{} servers : )".format(len(await bot.rest.fetch_my_guilds())),
+            type=h.ActivityType.LISTENING,
+        )
+    )
+
 
 for module in [
     autoposts,
