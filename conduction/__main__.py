@@ -28,6 +28,7 @@ from .modules import (
     user_commands,
     weekly_reset,
     xur,
+    process_control,
 )
 
 
@@ -55,6 +56,7 @@ async def autoupdate_status():
 for module in [
     autoposts,
     eververse,
+    process_control,
     repeater,
     twab,
     lost_sector,
