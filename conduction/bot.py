@@ -67,6 +67,11 @@ class CachedFetchBot(lb.BotApp):
         """This method fetches a user from the cache or from discord if not cached"""
         return self.cache.get_user(user) or await self.rest.fetch_user(user)
 
+    async def fetch_owner(self):
+        """This method fetches the primary owner of the bot from the cache or from
+        discord if not cached"""
+        return await self.fetch_user((await self.fetch_owner_ids())[0])
+
 
 class SchemaBackedCommand:
     """Base class for schema backed commands in a lightbulb bot
