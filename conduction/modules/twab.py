@@ -55,7 +55,7 @@ async def refresh_twab_data(bot: CachedFetchBot) -> None:
             # else make a new embed and do the same
             msg_proto = autocmd.MessagePrototype.from_message(message)
             msg_proto.merge_content_into_embed(0)
-            msg_proto.merge_attachements_into_embed(designator=message_no)
+            msg_proto.merge_embed_url_as_embed_image_into_embed(designator=message_no)
             msg_protos.append(msg_proto)
         if not msg_protos:
             msg_protos.append(
