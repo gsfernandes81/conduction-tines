@@ -93,6 +93,9 @@ class MultiImageEmbedList(list):
                 "Must set description property when using MultiImageEmbedList."
             )
 
+        if not kwargs.get("color") or kwargs.get("colour"):
+            kwargs["color"] = embed_default_color
+
         embed = h.Embed(
             *args, url=str(yarl.URL(url) % {"designator": designator}), **kwargs
         )
