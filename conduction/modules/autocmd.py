@@ -108,9 +108,7 @@ class MultiImageEmbedList(list):
         self.append(embed)
 
         for image in images:
-            embed = h.Embed(url=url, description="Masked description")
-            embed.set_image(url=image)
-            self.append(embed)
+            self.add_image(image)
 
     def add_image(self, image: str) -> t.Self:
         """Add an image to the MultiImageEmbedList instance."""
