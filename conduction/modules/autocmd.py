@@ -350,20 +350,18 @@ class MessagePrototype:
             designator (int, optional): The designator to use for the embed. Defaults to 0.
         """
         if not self.embeds:
-            self.embeds = [h.Embed()]
+            self.embeds = [h.Embed(color=embed_default_color)]
 
         embed_no = int(embed_no) % len(self.embeds)
 
-        if isinstance(self.embeds[embed_no], MultiImageEmbedList):
-            self.embeds = self.embeds[embed_no]
-            for attachment in self.attachments:
-                self.embeds.add_image(attachment.url)
-        else:
-            self.embeds = MultiImageEmbedList.from_embed(
-                self.embeds[embed_no],
-                designator,
-                [attachment.url for attachment in self.attachments],
-            )
+        embeds = MultiImageEmbedList.from_embed(
+            self.embeds.pop(embed_no),
+            designator,
+            [attachment.url for attachment in self.attachments],
+        )
+
+        for embed in embeds[::-1]:
+            self.embeds.insert(embed_no, embed)
 
         self.attachments = []
 
