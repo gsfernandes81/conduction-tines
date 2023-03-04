@@ -18,7 +18,7 @@ import sys
 import hikari as h
 import lightbulb as lb
 
-from .. import cfg
+from .. import cfg, utils
 
 
 @lb.command(
@@ -39,7 +39,7 @@ def process_control_command_group():
 @lb.implements(lb.SlashSubCommand)
 async def shutdown_command(ctx: lb.Context):
     await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-    if ctx.author.id not in await ctx.bot.fetch_owner_ids():
+    if await utils.check_invoker_is_owner(ctx):
         await ctx.respond("Only a bot owner can use this command")
     else:
         try:
@@ -56,7 +56,7 @@ async def shutdown_command(ctx: lb.Context):
 @lb.implements(lb.SlashSubCommand)
 async def restart_command(ctx: lb.Context):
     await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-    if ctx.author.id not in await ctx.bot.fetch_owner_ids():
+    if await utils.check_invoker_is_owner(ctx):
         await ctx.respond("Only a bot owner can use this command")
     else:
         try:
