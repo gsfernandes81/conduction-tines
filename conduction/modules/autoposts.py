@@ -86,7 +86,7 @@ def follow_control_command_maker(
                 await utils.check_invoker_is_owner(ctx)
                 or await utils.check_invoker_has_perms(ctx, end_user_allowed_perms)
             ):
-                owner = await bot.fetch_owner()
+                bot_owner = await bot.fetch_owner()
                 await ctx.respond(
                     h.Embed(
                         title="Insufficient permissions",
@@ -101,8 +101,8 @@ def follow_control_command_maker(
                         + "Feel free to contact me on discord if you are having issues!\n",
                         color=cfg.embed_default_color,
                     ).set_footer(
-                        f"{owner.username}#{owner.discriminator}",
-                        icon=owner.avatar_url or owner.default_avatar_url,
+                        f"{bot_owner.username}#{bot_owner.discriminator}",
+                        icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                     )
                 )
                 return
@@ -192,12 +192,15 @@ def follow_control_command_maker(
                             + "- Manage Webhooks\n"
                             + "- Send Messages\n"
                             + "```\n"
-                            + "If you are still having issues, please contact "
-                            + f"**{bot_owner.username}#{bot_owner.discriminator}**",
+                            + "If you are still having issues, please contact me on discord!\n",
                             color=cfg.embed_default_color,
+                        ).set_footer(
+                            f"{bot_owner.username}#{bot_owner.discriminator}",
+                            icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                         )
                     )
-                raise e
+                else:
+                    raise e
         except Exception as e:
             error_reference = randint(1000000, 9999999)
             bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[-1])
@@ -206,10 +209,13 @@ def follow_control_command_maker(
                     title="Pardon our dust!",
                     description="An error occurred while trying to update autopost settings. "
                     + "Please contact "
-                    + f"**{bot_owner.username}#{bot_owner.discriminator}** with the "
+                    + "me **(username at the bottom of the embed)** with the "
                     + f"error reference `{error_reference}` and we will fix this "
                     + "for you.",
                     color=cfg.embed_default_color,
+                ).set_footer(
+                    f"{bot_owner.username}#{bot_owner.discriminator}",
+                    icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                 )
             )
             await utils.discord_error_logger(bot, e, error_reference)
