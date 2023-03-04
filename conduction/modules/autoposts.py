@@ -181,7 +181,7 @@ def follow_control_command_maker(
                     # If we are missing permissions, then we can't delete the webhook
                     # In this case, notify the user with a list of possibly missing
                     # permissions
-                    bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[0])
+                    bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[-1])
                     await ctx.respond(
                         h.Embed(
                             title="Missing Permissions",
@@ -200,7 +200,7 @@ def follow_control_command_maker(
                 raise e
         except Exception as e:
             error_reference = randint(1000000, 9999999)
-            bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[0])
+            bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[-1])
             await ctx.respond(
                 h.Embed(
                     title="Pardon our dust!",

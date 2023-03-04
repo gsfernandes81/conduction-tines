@@ -211,7 +211,7 @@ async def preview_command(
     else:
         await ctx.respond(
             "Preview generated.\nIf no response is visible then please contact"
-            + f" <@{(await bot.fetch_owner_ids())[0]}>.\n\n"
+            + f" <@{(await bot.fetch_owner_ids())[-1]}>.\n\n"
             + "Raw response data:\n```\n"
             + response
             + "\n```"

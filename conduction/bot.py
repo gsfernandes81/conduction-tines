@@ -70,7 +70,7 @@ class CachedFetchBot(lb.BotApp):
     async def fetch_owner(self):
         """This method fetches the primary owner of the bot from the cache or from
         discord if not cached"""
-        return await self.fetch_user((await self.fetch_owner_ids())[0])
+        return await self.fetch_user((await self.fetch_owner_ids())[-1])
 
 
 class SchemaBackedCommand:
