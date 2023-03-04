@@ -60,7 +60,12 @@ async def refresh_twab_data(bot: CachedFetchBot) -> None:
         if not msg_protos:
             msg_protos.append(
                 autocmd.MessagePrototype(
-                    embeds=(h.Embed(description="No TWAB this week!"),)
+                    embeds=(
+                        h.Embed(
+                            description="No TWAB this week!",
+                            color=cfg.embed_default_color,
+                        ),
+                    )
                 )
             )
     except Exception as e:

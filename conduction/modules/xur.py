@@ -26,7 +26,7 @@ async def get_basic_xur_embed():
     return h.Embed(
         title="Xur",
         url=await utils.follow_link_single_step("https://kyberscorner.com/"),
-        color=cfg.kyber_pink,
+        color=cfg.embed_default_color,
     ).set_image("https://kyber3000.com/Xur")
 
 
