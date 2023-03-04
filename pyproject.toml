@@ -18,6 +18,7 @@ sqlalchemy = "^2.0.1"
 aiohttp = "^3.8.3"
 regex = "^2022.10.31"
 yarl = "^1.8.2"
+hikari-toolbox = "^0.1.5"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"

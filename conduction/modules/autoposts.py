@@ -25,6 +25,14 @@ from .. import cfg, utils
 from ..bot import CachedFetchBot, UserCommandBot
 from ..schemas import MirroredChannel, db_session
 
+# Permissions that allow users to manage autoposts in a guild
+end_user_allowed_perms = (
+    h.Permissions.MANAGE_WEBHOOKS,
+    h.Permissions.MANAGE_GUILD,
+    h.Permissions.MANAGE_CHANNELS,
+    h.Permissions.ADMINISTRATOR,
+)
+
 autopost_command_group = lb.command(name="autoposts", description="Autopost control")(
     lb.implements(lb.SlashCommandGroup)(lambda: None)
 )
@@ -73,6 +81,32 @@ def follow_control_command_maker(
         await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
 
         try:
+
+            if not (
+                await utils.check_invoker_is_owner(ctx)
+                or await utils.check_invoker_has_perms(ctx, end_user_allowed_perms)
+            ):
+                owner = await bot.fetch_owner()
+                await ctx.respond(
+                    h.Embed(
+                        title="Insufficient permissions",
+                        description="You have insufficient permissions to use this command.\n"
+                        + "Any one of the following permissions is needed:\n```\n"
+                        + "- Manage Webhooks\n"
+                        + "- Manage Guild\n"
+                        + "- Manage Channel\n"
+                        + "- Administrator\n```\n"
+                        + "Make sure that you have this permission in this channel and not "
+                        + "just in this guild\n"
+                        + "Feel free to contact me on discord if you are having issues!\n",
+                        color=cfg.embed_default_color,
+                    ).set_footer(
+                        f"{owner.username}#{owner.discriminator}",
+                        icon=owner.avatar_url or owner.default_avatar_url,
+                    )
+                )
+                return
+
             try:
                 if option:
                     # If we are enabling autoposts:

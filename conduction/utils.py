@@ -18,9 +18,11 @@ import logging
 import traceback as tb
 import typing as t
 from random import randint
+import lightbulb as lb
 
 import aiohttp
 import hikari as h
+from toolbox.members import calculate_permissions
 
 from . import cfg
 
@@ -111,3 +113,34 @@ def accumulate(iterable):
     for arg in iterable[1:]:
         final = final + arg
     return final
+
+
+async def check_invoker_has_perms(
+    ctx: lb.Context,
+    permissions: h.Permissions | t.List[h.Permissions],
+    all_required=False,
+):
+    bot: lb.BotApp = ctx.bot
+    invoker = ctx.author
+    if not isinstance(permissions, (list, tuple)):
+        permissions = (permissions,)
+
+    channel = await bot.rest.fetch_channel(ctx.channel_id)
+    member = await bot.rest.fetch_member(ctx.guild_id, invoker.id)
+    invoker_perms = calculate_permissions(member, channel)
+
+    if all_required:
+        return all(
+            [permission == (permission & invoker_perms) for permission in permissions]
+        )
+    else:
+        return any(
+            [permission == (permission & invoker_perms) for permission in permissions]
+        )
+
+
+async def check_invoker_is_owner(ctx: lb.Context):
+    bot: lb.BotApp = ctx.bot
+    invoker = ctx.author
+    logging.error(str(await bot.fetch_owner_ids()))
+    return invoker.id in await bot.fetch_owner_ids()
