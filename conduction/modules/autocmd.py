@@ -380,12 +380,20 @@ class MessagePrototype:
         embeds = MultiImageEmbedList.from_embed(
             self.embeds.pop(embed_no),
             designator,
-            [attachment.url for attachment in self.attachments],
+            [
+                attachment.url
+                for attachment in self.attachments
+                if str(attachment.media_type).startswith("image")
+            ],
         )
 
         for embed in embeds[::-1]:
             self.embeds.insert(embed_no, embed)
 
-        self.attachments = []
+        self.attachments = [
+            attachment
+            for attachment in self.attachments
+            if not str(attachment.media_type).startswith("image")
+        ]
 
         return self
