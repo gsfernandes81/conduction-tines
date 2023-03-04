@@ -140,11 +140,12 @@ class MultiImageEmbedList(list):
             timestamp=embed.timestamp,
         )
 
-        multi_image_embed[0].set_image(embed.image.url if embed.image else None)
-        multi_image_embed[0].set_footer(embed.footer.text, icon=embed.footer.icon)
-        multi_image_embed[0].set_thumbnail(
-            embed.thumbnail.url if embed.thumbnail else None
-        )
+        if embed.image:
+            multi_image_embed[0].set_image(embed.image.url)
+        if embed.footer:
+            multi_image_embed[0].set_footer(embed.footer.text, icon=embed.footer.icon)
+        if embed.thumbnail:
+            multi_image_embed[0].set_thumbnail(embed.thumbnail.url)
         if embed.author:
             multi_image_embed[0].set_author(
                 name=embed.author.name, url=embed.author.url, icon=embed.author.icon
