@@ -338,6 +338,28 @@ class MessagePrototype:
 
         return self
 
+    def merge_embed_url_as_embed_image_into_embed(
+        self, embed_no: int = 0, designator: int = 0
+    ) -> t.Self:
+
+        if not self.embeds:
+            self.embeds = [h.Embed(color=embed_default_color)]
+
+        embed_no = int(embed_no) % len(self.embeds)
+
+        embed = self.embeds.pop(embed_no)
+        embeds = MultiImageEmbedList.from_embed(
+            embed,
+            designator,
+            [embed.url],
+        )
+        embeds[0].set_thumbnail(None)
+
+        for embed in embeds[::-1]:
+            self.embeds.insert(embed_no, embed)
+
+        return self
+
     def merge_attachements_into_embed(
         self,
         embed_no: int = -1,
