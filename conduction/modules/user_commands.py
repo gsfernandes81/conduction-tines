@@ -33,7 +33,7 @@ NOTE_ABOUT_SLOW_DISCORD_PROPAGATION = (
 )
 
 
-@lb.add_checks(lb.checks.has_roles(cfg.control_discord_role_id))
+@lb.add_checks(lb.checks.owner_only)
 @lb.command(
     "command",
     "Custom command control",
