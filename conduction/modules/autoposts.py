@@ -99,7 +99,7 @@ def follow_control_command_maker(
                         + "Make sure that you have this permission in this channel and not "
                         + "just in this guild\n"
                         + "Feel free to contact me on discord if you are having issues!\n",
-                        color=cfg.embed_default_color,
+                        color=cfg.embed_error_color,
                     ).set_footer(
                         f"{bot_owner.username}#{bot_owner.discriminator}",
                         icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
@@ -193,7 +193,7 @@ def follow_control_command_maker(
                             + "- Send Messages\n"
                             + "```\n"
                             + "If you are still having issues, please contact me on discord!\n",
-                            color=cfg.embed_default_color,
+                            color=cfg.embed_error_color,
                         ).set_footer(
                             f"{bot_owner.username}#{bot_owner.discriminator}",
                             icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
@@ -212,7 +212,7 @@ def follow_control_command_maker(
                     + "me **(username at the bottom of the embed)** with the "
                     + f"error reference `{error_reference}` and we will fix this "
                     + "for you.",
-                    color=cfg.embed_default_color,
+                    color=cfg.embed_error_color,
                 ).set_footer(
                     f"{bot_owner.username}#{bot_owner.discriminator}",
                     icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
