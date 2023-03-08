@@ -723,6 +723,24 @@ server = ["pynacl (>=1.5,<2.0)"]
 speedups = ["aiohttp[speedups] (>=3.8,<4.0)", "ciso8601 (>=2.3,<3.0)", "orjson (>=3.8,<4.0)"]
 
 [[package]]
+name = "hikari-flare"
+version = "0.1.0b4"
+description = "Stateless component manager for hikari with type-safe API."
+category = "main"
+optional = false
+python-versions = "<3.12,>=3.10"
+files = [
+    {file = "hikari-flare-0.1.0b4.tar.gz", hash = "sha256:fe270eb1dc4d946db1942319037d26a1bc74b8491b2a016ae6545d913796b456"},
+    {file = "hikari_flare-0.1.0b4-py3-none-any.whl", hash = "sha256:40b7c2a78881b623acd2e6467fffcd98d474f4bdd308ec38e0756d14f1fd1b39"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+hikari = ">=2.0.0.dev116"
+sigparse = ">=3.0.0"
+typing-extensions = ">=4.4.0"
+
+[[package]]
 name = "hikari-lightbulb"
 version = "2.3.1"
 description = "A simple to use command handler for Hikari"
@@ -1357,6 +1375,18 @@ reference = "cf35318"
 resolved_reference = "cf35318c145ee4ff186ed8e39846a1ca2b1b6464"
 
 [[package]]
+name = "sigparse"
+version = "3.0.0"
+description = "Backports python3.10 typing features into python 3.7 and newer."
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "sigparse-3.0.0-py3-none-any.whl", hash = "sha256:51926c7914e5386d43d9503036c93e698e5a32cb88fc8336d89187739f04ddee"},
+    {file = "sigparse-3.0.0.tar.gz", hash = "sha256:608d14fd5ead44d84482f2a1139803a0416157a0bac2fffa12382caac9566680"},
+]
+
+[[package]]
 name = "six"
 version = "1.16.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -1605,4 +1635,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.1"
-content-hash = "b9f562416aeee1cc07cbf41c1781e06c119b77da1da851d4fa695f28f1824b6b"
+content-hash = "74677e7d5d92268e1d2d2bb6dbac8d63e0137a21986f894e826851b2d6dd2e83"

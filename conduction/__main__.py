@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import flare
 import hikari as h
 import lightbulb as lb
 from lightbulb.ext import tasks
@@ -23,12 +24,12 @@ from .modules import (
     autoposts,
     eververse,
     lost_sector,
+    process_control,
     repeater,
     twab,
     user_commands,
     weekly_reset,
     xur,
-    process_control,
 )
 
 
@@ -68,4 +69,5 @@ for module in [
 
 
 tasks.load(bot)
+flare.install(bot)
 bot.run()
