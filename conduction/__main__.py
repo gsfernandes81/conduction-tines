@@ -13,9 +13,9 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
-import flare
 import hikari as h
 import lightbulb as lb
+import miru
 from lightbulb.ext import tasks
 
 from . import cfg, schemas
@@ -69,5 +69,5 @@ for module in [
 
 
 tasks.load(bot)
-flare.install(bot)
+miru.install(bot)
 bot.run()

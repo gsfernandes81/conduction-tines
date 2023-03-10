@@ -17,9 +17,9 @@ import datetime as dt
 import typing as t
 from calendar import month_name
 
-import flare
 import hikari as h
 import lightbulb as lb
+import miru
 import sector_accounting
 from lightbulb.ext import tasks
 from pytz import utc
@@ -64,8 +64,12 @@ async def lost_sector_today_command(ctx: lb.Context):
         "ls_url": ls_gfx_url,
     }
 
-    full_rotation = flare.LinkButton(cfg.ls_rotation_webpage, label="Full Rotation")
-    all_infogfx = flare.LinkButton(cfg.ls_infogfx_webpage, label="All Infographics")
+    full_rotation = miru.Button(
+        style=h.ButtonStyle.LINK, label="Full Rotation", url=cfg.ls_rotation_webpage
+    )
+    all_infogfx = miru.Button(
+        style=h.ButtonStyle.LINK, label="All Infographics", url=cfg.ls_infogfx_webpage
+    )
     await ctx.respond(
         embed=h.Embed(
             title="**Lost Sector Today**".format(**format_dict),
@@ -83,7 +87,7 @@ async def lost_sector_today_command(ctx: lb.Context):
             ).format(**format_dict),
             color=cfg.embed_default_color,
         ).set_image(ls_gfx_url),
-        component=(await flare.Row(full_rotation, all_infogfx)),
+        components=miru.View().add_item(full_rotation).add_item(all_infogfx),
     )
 
 
