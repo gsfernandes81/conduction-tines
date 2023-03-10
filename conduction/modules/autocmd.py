@@ -168,11 +168,17 @@ async def pull_messages_from_channel(
     bot: CachedFetchBot,
     after: dt.datetime,
     channel_id: h.Snowflake,
+    before: dt.datetime | None = None,
 ):
     messages: t.List[h.Message] = []
     channel: h.TextableGuildChannel = await bot.fetch_channel(int(channel_id))
 
+    if not before:
+        before = dt.datetime.now(dt.timezone.utc)
+
     async for message in channel.fetch_history(after=after):
+        if message.timestamp > before:
+            break
         messages.append(message)
 
     return messages
