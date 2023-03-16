@@ -254,7 +254,15 @@ class UserCommandBot(lb.BotApp):
 
             @decorator
             async def _responder(ctx: lb.Context):
-                await ctx.respond(cmd.response_data)
+                text = cmd.response_data.strip()
+                # Follow redirects once if any, then substitute these
+                # url into the text and respond with it
+                await ctx.respond(
+                    cfg.url_regex.sub("{}", text).format(
+                        await utils.follow_link_single_step(link)
+                        for link in cfg.url_regex.findall(text)
+                    )
+                )
 
         elif cmd.response_type == 2:
 
@@ -284,6 +292,7 @@ class UserCommandBot(lb.BotApp):
                 embed = h.Embed(**embed_kwargs)
 
                 if image:
+                    image = await utils.follow_link_single_step(image)
                     embed.set_image(image)
 
                 await ctx.respond(embed)

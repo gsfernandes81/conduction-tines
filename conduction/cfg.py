@@ -18,6 +18,7 @@ import ssl
 from os import getenv as _getenv
 
 import hikari as h
+import regex as re
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Discord bot parameters
@@ -81,3 +82,8 @@ log_channel = int(_getenv("LOG_CHANNEL"))
 # Kyber's links
 ls_rotation_webpage = _getenv("LS_ROTATION_WEBPAGE")
 ls_infogfx_webpage = _getenv("LS_INFOGFX_WEBPAGE")
+
+# URL Regex
+url_regex = re.compile(
+    "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+)
