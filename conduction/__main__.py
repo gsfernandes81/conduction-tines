@@ -18,7 +18,7 @@ import lightbulb as lb
 import miru
 from lightbulb.ext import tasks
 
-from . import cfg, schemas
+from . import cfg, schemas, utils
 from .bot import CachedFetchBot, UserCommandBot
 from .modules import (
     autoposts,
@@ -42,9 +42,7 @@ bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
 
 @tasks.task(m=5, auto_start=True, wait_before_execution=False)
 async def autoupdate_status():
-    if not bot.d.has_lb_started:
-        await bot.wait_for(lb.LightbulbStartedEvent, timeout=None)
-        bot.d.has_lightbulb_started = True
+    await utils.wait_till_lightbulb_started(bot)
 
     await bot.update_presence(
         activity=h.Activity(

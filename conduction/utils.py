@@ -170,3 +170,9 @@ def get_ordinal_suffix(day: int) -> str:
         if day not in (11, 12, 13)
         else "th"
     )
+
+
+async def wait_till_lightbulb_started(bot: lb.BotApp):
+    if not bot.d.has_lb_started:
+        await bot.wait_for(lb.LightbulbStartedEvent, timeout=None)
+        bot.d.has_lightbulb_started = True
