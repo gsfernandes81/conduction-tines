@@ -428,6 +428,10 @@ class NavPages(dict, abc.ABC):
             if value:
                 # Don't preprocess empty lists
                 self[key] = self.preprocess_messages(value)
+            else:
+                self[key] = MessagePrototype(
+                    embeds=[h.Embed(title="No data here!", color=embed_default_color)]
+                )
 
     async def _update_history(self):
         after = self.period_around(dt.datetime.now(tz=dt.timezone.utc))[0]
@@ -436,7 +440,12 @@ class NavPages(dict, abc.ABC):
         async for msg in self.channel.fetch_history(after=after - reset_time_tolerance):
             self[after].append(msg)
 
-        self[after] = self.preprocess_messages(self[after])
+        if self[after]:
+            self[after] = self.preprocess_messages(self[after])
+        else:
+            self[after] = MessagePrototype(
+                embeds=[h.Embed(title="No data yet!", color=embed_default_color)]
+            )
 
     async def _update_lookahead(self):
         if self.lookahead_len <= 0:
