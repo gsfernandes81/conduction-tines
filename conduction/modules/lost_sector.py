@@ -27,7 +27,6 @@ from .autocmd import MessagePrototype, NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
 
 FOLLOWABLE_CHANNEL = cfg.followables["lost_sector"]
-sectors = []
 
 
 class SectorMessages(NavPages):
