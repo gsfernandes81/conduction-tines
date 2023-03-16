@@ -13,19 +13,22 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import abc
 import datetime as dt
-import logging
 import typing as t
+from asyncio import sleep
+from random import randint
+
 import attr
-
-# TEST CODE
-from inspect import currentframe, getframeinfo
-
 import hikari as h
+import miru
 import yarl
+from lightbulb.ext import tasks
+from miru.ext import nav
 
+from .. import utils
 from ..bot import CachedFetchBot
-from ..cfg import default_url, embed_default_color
+from ..cfg import default_url, embed_default_color, reset_time_tolerance
 
 
 class SimpleEmbed(h.Embed):
@@ -330,3 +333,287 @@ class MessagePrototype:
         ]
 
         return self
+
+
+class NavPages(dict, abc.ABC):
+    """Class to maintain a dict of slash command responses over time.
+
+    The key for the dict is the datetime after which the response was posted
+    and the value is the MessagePrototype instance for the response.
+    __init__ registers tasks to update the dict regularly based on history_update_interval
+    and lookahead_update_interval."""
+
+    def __init__(
+        self,
+        channel: h.GuildNewsChannel,
+        history_len: int = 7,
+        lookahead_len: int = 0,
+        history_update_interval: int = 60,
+        lookahead_update_interval: int = 1800,
+    ):
+        super().__init__()
+        self.channel = channel
+        self.history_len = history_len
+        self.lookahead_len = lookahead_len
+        self.history_update_interval = history_update_interval
+        self.lookahead_update_interval = lookahead_update_interval
+
+        if self.history_len > 0:
+
+            @tasks.task(
+                s=self.history_update_interval,
+                auto_start=True,
+                wait_before_execution=False,
+            )
+            async def history_update_task():
+                # Introduce a 5% jitter to the update interval
+                # to avoid ratelimit issues
+                await sleep(randint(0, int(self.history_update_interval / 20)))
+                await self._update_history()
+
+        if self.lookahead_len > 0:
+
+            @tasks.task(
+                s=self.history_update_interval,
+                auto_start=True,
+                wait_before_execution=False,
+            )
+            async def lookahead_update_task():
+                # Introduce a 5% jitter to the update interval
+                # to avoid ratelimit issues
+                await sleep(randint(0, int(self.lookahead_update_interval / 20)))
+                await self._update_lookahead()
+
+    def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
+        """Return the MessagePrototype for the period containing <key>
+
+        If <key> is an int then it is interpreted as the number of periods after the current period."""
+        if isinstance(key, int):
+            key = self.index_to_date(key)
+
+        if key not in self:
+            raise KeyError(f"No response found for {key} in {[k.date() for k in self]}")
+
+        return super().__getitem__(key)
+
+    @classmethod
+    @abc.abstractmethod
+    def preprocess_messages(
+        cls, messages: t.List[MessagePrototype | h.Message]
+    ) -> MessagePrototype:
+        pass
+
+    @staticmethod
+    @abc.abstractmethod
+    def period_around(cls, date: dt.datetime = None) -> t.Tuple[dt.datetime]:
+        """Return datetimes between which to find a response.
+
+        The datetimes are returned such that <date> is between.
+        If date is None then use dt.datetime.now(tz=utc)"""
+        pass
+
+    @classmethod
+    async def from_channel(cls, bot: CachedFetchBot, channel, **kwargs) -> t.Self:
+        if isinstance(channel, (int, h.Snowflake)):
+            channel = await bot.fetch_channel(int(channel))
+
+        if not isinstance(channel, h.GuildNewsChannel):
+            raise TypeError(
+                f"Cannot create {cls.__name__} from {channel.__class__.__name__} "
+                + "since it is not an Announce channel"
+            )
+
+        self: t.Self = cls(channel, **kwargs)
+
+        await self._populate_history()
+        await self._update_lookahead()
+
+        return self
+
+    async def _populate_history(self):
+        # Find start time
+        after = (
+            self.period_around(dt.datetime.now(tz=dt.timezone.utc))[0]
+            - self.period * self.history_len
+        )
+
+        # Bin messages into periods
+        async for msg in self.channel.fetch_history(after=after - reset_time_tolerance):
+            msg_time = msg.edited_timestamp or msg.timestamp
+            start_of_period = self.period_around(msg_time + reset_time_tolerance)[0]
+
+            if not self.get(start_of_period):
+                self[start_of_period] = []
+
+            self[start_of_period].append(msg)
+
+        # Preprocess messages
+        for key, value in self.items():
+            if value:
+                # Don't preprocess empty lists
+                self[key] = self.preprocess_messages(value)
+
+    async def _update_history(self):
+        after = self.period_around(dt.datetime.now(tz=dt.timezone.utc))[0]
+
+        self[after] = []
+        async for msg in self.channel.fetch_history(after=after - reset_time_tolerance):
+            self[after].append(msg)
+
+        self[after] = self.preprocess_messages(self[after])
+
+    async def _update_lookahead(self):
+        if self.lookahead_len <= 0:
+            return
+
+        self.update(
+            await self.lookahead(
+                self.period_around(dt.datetime.now(tz=dt.timezone.utc))[0] + self.period
+            )
+        )
+
+    @classmethod
+    @property
+    def period(cls):
+        """Time interval between new sets of announcements"""
+        return cls.period_around()[1] - cls.period_around()[0]
+
+    async def lookahead(
+        self, after: dt.datetime
+    ) -> t.Dict[dt.datetime, MessagePrototype]:
+        """Return the predicted messages for the periods after <after>
+
+        The dict must have <self.lookahead_len> entries, indexed by the start of the
+        period and must contain the MessagePrototype for that period."""
+        return {}
+
+    @classmethod
+    def index_to_date(cls, index: int) -> dt.datetime:
+        """Return the datetime of the period at <index>"""
+        return (
+            cls.period_around(dt.datetime.now(tz=dt.timezone.utc))[0]
+            + index * cls.period
+        )
+
+
+class NextButton(nav.NavButton):
+    """
+    A built-in NavButton to jump to the next page.
+    """
+
+    def __init__(
+        self,
+        *,
+        style: t.Union[h.ButtonStyle, int] = h.ButtonStyle.PRIMARY,
+        label: t.Optional[str] = None,
+        custom_id: t.Optional[str] = None,
+        emoji: t.Union[h.Emoji, str, None] = chr(9654),
+        row: t.Optional[int] = None,
+    ):
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
+        )
+
+    async def callback(self, context: miru.ViewContext) -> None:
+        self.view.current_page += 1
+        await self.view.send_page(context)
+
+    async def before_page_change(self) -> None:
+        self._before_page_change()
+
+    def _before_page_change(self) -> None:
+        if self.view.current_page >= self.view.pages.lookahead_len:
+            self.disabled = True
+        else:
+            self.disabled = False
+
+
+class PrevButton(nav.NavButton):
+    """
+    A built-in NavButton to jump to previous page.
+    """
+
+    def __init__(
+        self,
+        *,
+        style: t.Union[h.ButtonStyle, int] = h.ButtonStyle.PRIMARY,
+        label: t.Optional[str] = None,
+        custom_id: t.Optional[str] = None,
+        emoji: t.Union[h.Emoji, str, None] = chr(9664),
+        row: t.Optional[int] = None,
+    ):
+        super().__init__(
+            style=style, label=label, custom_id=custom_id, emoji=emoji, row=row
+        )
+
+    async def callback(self, context: miru.ViewContext) -> None:
+        self.view.current_page -= 1
+        await self.view.send_page(context)
+
+    async def before_page_change(self) -> None:
+        if self.view.current_page <= 1 - self.view.pages.history_len:
+            self.disabled = True
+        else:
+            self.disabled = False
+
+
+class IndicatorButton(nav.IndicatorButton):
+    """
+    A built-in NavButton to indicate the current page.
+    """
+
+    def __init__(
+        self,
+        *,
+        custom_id: t.Optional[str] = None,
+        emoji: t.Union[h.Emoji, str, None] = None,
+        row: t.Optional[int] = None,
+    ):
+        super().__init__(
+            style=h.ButtonStyle.SECONDARY, custom_id=custom_id, emoji=emoji, row=row
+        )
+
+    async def callback(self, context: miru.ViewContext) -> None:
+        pass
+
+    async def before_page_change(self) -> None:
+        date = self.view.pages.index_to_date(self.view.current_page)
+        suffix = utils.get_ordinal_suffix(date.day)
+        self.label = f"{date.strftime('%B %-d')}{suffix}"
+
+
+class NavigatorView(nav.NavigatorView):
+    def __init__(
+        self,
+        *,
+        pages: NavPages,
+        timeout: t.Optional[t.Union[float, int, dt.timedelta]] = 120,
+        autodefer: bool = True,
+    ) -> None:
+        super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)
+
+    def _get_page_payload(self, page: MessagePrototype) -> t.MutableMapping[str, t.Any]:
+        """Get the page content that is to be sent."""
+        if self.ephemeral:
+            return dict(
+                **page.to_message_kwargs(),
+                flags=h.MessageFlag.EPHEMERAL,
+            )
+        else:
+            return dict(**page.to_message_kwargs(), components=self)
+
+    @property
+    def current_page(self) -> int:
+        """
+        The current page of the navigator, zero-indexed integer.
+        """
+        return self._current_page
+
+    @current_page.setter
+    def current_page(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("Expected type int for property current_page.")
+        self._current_page = value
+
+    def get_default_buttons(self) -> t.Sequence[nav.NavButton]:
+        return [PrevButton(), IndicatorButton(), NextButton()]

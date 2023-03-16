@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import datetime as dt
 import json
 import ssl
 from os import getenv as _getenv
@@ -78,6 +79,8 @@ control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
 default_url = str(_getenv("DEFAULT_URL"))
 followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 log_channel = int(_getenv("LOG_CHANNEL"))
+# Minutes of buffer, search messages this many minutes earlier
+reset_time_tolerance = dt.timedelta(minutes=60)
 
 # Kyber's links
 ls_rotation_webpage = _getenv("LS_ROTATION_WEBPAGE")
