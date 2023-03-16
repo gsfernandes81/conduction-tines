@@ -23,8 +23,8 @@ from pytz import utc
 
 from .. import cfg, utils
 from ..bot import CachedFetchBot
-from .autoposts import autopost_command_group, follow_control_command_maker
 from . import autocmd
+from .autoposts import autopost_command_group, follow_control_command_maker
 
 EVERVERSE_WEEKLY = cfg.followables["eververse"]
 EVERVERSE_DAILY = cfg.followables["daily_reset"]
@@ -36,14 +36,6 @@ def weekly_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
     start = now - dt.timedelta(days=(now.weekday() - 1) % 7)
     # Ends at the same day and time next week
     end = start + dt.timedelta(days=7)
-    return start, end
-
-
-def daily_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
-    now = now or dt.datetime.now(tz=utc) - dt.timedelta(hours=17)
-    now = dt.datetime(now.year, now.month, now.day, 17, 0, 0, tzinfo=utc)
-    start = now
-    end = start + dt.timedelta(days=1)
     return start, end
 
 
@@ -78,7 +70,7 @@ async def refresh_eververse_daily_data(bot: CachedFetchBot) -> None:
     global eververse_daily_message_kwargs
 
     messages = await autocmd.pull_messages_from_channel(
-        bot, after=daily_reset_period()[0], channel_id=EVERVERSE_DAILY
+        bot, after=utils.daily_reset_period()[0], channel_id=EVERVERSE_DAILY
     )
 
     # Merge all the images into the last embed for each message

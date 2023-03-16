@@ -13,15 +13,16 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import datetime as dt
 import inspect
 import logging
 import traceback as tb
 import typing as t
 from random import randint
-import lightbulb as lb
 
 import aiohttp
 import hikari as h
+import lightbulb as lb
 from toolbox.members import calculate_permissions
 
 from . import cfg
@@ -144,3 +145,19 @@ async def check_invoker_is_owner(ctx: lb.Context):
     invoker = ctx.author
     logging.error(str(await bot.fetch_owner_ids()))
     return invoker.id in await bot.fetch_owner_ids()
+
+
+def daily_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
+    now = (now or dt.datetime.now(tz=dt.timezone.utc)) - dt.timedelta(hours=17)
+    now = dt.datetime(now.year, now.month, now.day, 17, 0, 0, tzinfo=dt.timezone.utc)
+    start = now
+    end = start + dt.timedelta(days=1)
+    return start, end
+
+
+def get_ordinal_suffix(day: int) -> str:
+    return (
+        {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+        if day not in (11, 12, 13)
+        else "th"
+    )
