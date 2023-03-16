@@ -603,7 +603,7 @@ class NavigatorView(nav.NavigatorView):
     ) -> None:
         super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)
 
-    def _get_page_payload(self, page: MessagePrototype) -> t.MutableMapping[str, t.Any]:
+    def get_page_payload(self, page: MessagePrototype) -> t.MutableMapping[str, t.Any]:
         """Get the page content that is to be sent."""
         if self.ephemeral:
             return dict(
