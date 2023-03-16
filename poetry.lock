@@ -749,10 +749,8 @@ description = "An alternative component handler for hikari, inspired by discord.
 category = "main"
 optional = false
 python-versions = ">=3.8.0,<3.12"
-files = [
-    {file = "hikari-miru-3.0.2.tar.gz", hash = "sha256:f4c20c2d61748fe259cc4065bbd6cbd55c12069f7e75495cc7ff92ccf934d6e9"},
-    {file = "hikari_miru-3.0.2-py3-none-any.whl", hash = "sha256:302df30d37bc062db9fcfbfda869e71ddb41968ea6f43dda9f04d63351776ca1"},
-]
+files = []
+develop = false
 
 [package.dependencies]
 colorama = {version = "*", markers = "sys_platform == \"win32\""}
@@ -760,6 +758,12 @@ hikari = ">=2.0.0.dev116"
 
 [package.extras]
 docs = ["furo (>=2022.1.2,<2022.2.0)", "sphinx (==4.4.0)"]
+
+[package.source]
+type = "git"
+url = "https://github.com/gs729/hikari-miru.git"
+reference = "HEAD"
+resolved_reference = "94a868cc378a7aa081a4bb83b04d0aa2ef065293"
 
 [[package]]
 name = "hikari-toolbox"
@@ -1624,4 +1628,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.1"
-content-hash = "1ddc67f72996ce1cd63a78ef76e50c6b538ceef6d9f958ef873ef853fb48efb3"
+content-hash = "4fd6c5c9f6d2ddc92c4b4a6004b28c99e91b965869dcbdfdb7204a7ed4b58778"
