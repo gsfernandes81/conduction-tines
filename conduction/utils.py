@@ -156,7 +156,7 @@ def daily_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
 
 
 def weekly_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
-    now = now or dt.datetime.now(tz=dt.timezone.utc) - dt.timedelta(hours=17)
+    now = (now or dt.datetime.now(tz=dt.timezone.utc)) - dt.timedelta(hours=17)
     now = dt.datetime(now.year, now.month, now.day, 17, 0, 0, tzinfo=dt.timezone.utc)
     start = now - dt.timedelta(days=(now.weekday() - 1) % 7)
     # Ends at the same day and time next week
