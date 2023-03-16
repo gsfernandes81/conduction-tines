@@ -21,6 +21,7 @@ from random import randint
 
 import attr
 import hikari as h
+import lightbulb as lb
 import miru
 import yarl
 from lightbulb.ext import tasks
@@ -358,32 +359,6 @@ class NavPages(dict, abc.ABC):
         self.history_update_interval = history_update_interval
         self.lookahead_update_interval = lookahead_update_interval
 
-        if self.history_len > 0:
-
-            @tasks.task(
-                s=self.history_update_interval,
-                auto_start=True,
-                wait_before_execution=False,
-            )
-            async def history_update_task():
-                # Introduce a 5% jitter to the update interval
-                # to avoid ratelimit issues
-                await sleep(randint(0, int(self.history_update_interval / 20)))
-                await self._update_history()
-
-        if self.lookahead_len > 0:
-
-            @tasks.task(
-                s=self.history_update_interval,
-                auto_start=True,
-                wait_before_execution=False,
-            )
-            async def lookahead_update_task():
-                # Introduce a 5% jitter to the update interval
-                # to avoid ratelimit issues
-                await sleep(randint(0, int(self.lookahead_update_interval / 20)))
-                await self._update_lookahead()
-
     def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
         """Return the MessagePrototype for the period containing <key>
 
@@ -427,6 +402,7 @@ class NavPages(dict, abc.ABC):
 
         await self._populate_history()
         await self._update_lookahead()
+        self._setup_autoupdate()
 
         return self
 
@@ -471,6 +447,41 @@ class NavPages(dict, abc.ABC):
                 self.period_around(dt.datetime.now(tz=dt.timezone.utc))[0] + self.period
             )
         )
+
+    def _setup_autoupdate(self):
+        if self.history_len > 0:
+
+            @tasks.task(
+                s=self.history_update_interval,
+                auto_start=True,
+                wait_before_execution=False,
+                pass_app=True,
+            )
+            async def history_update_task(bot: lb.BotApp):
+                try:
+                    # Introduce a 5% jitter to the update interval
+                    # to avoid ratelimit issues
+                    await sleep(randint(0, int(self.history_update_interval / 20)))
+                    await self._update_history()
+                except Exception as e:
+                    await utils.discord_error_logger(bot, e)
+
+        if self.lookahead_len > 0:
+
+            @tasks.task(
+                s=self.history_update_interval,
+                auto_start=True,
+                wait_before_execution=False,
+                pass_app=True,
+            )
+            async def lookahead_update_task(bot: lb.BotApp):
+                try:
+                    # Introduce a 5% jitter to the update interval
+                    # to avoid ratelimit issues
+                    await sleep(randint(0, int(self.lookahead_update_interval / 20)))
+                    await self._update_lookahead()
+                except Exception as e:
+                    await utils.discord_error_logger(bot, e)
 
     @classmethod
     @property
