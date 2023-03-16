@@ -13,13 +13,9 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
-import datetime as dt
-import typing as t
-
 import hikari as h
 import lightbulb as lb
 from lightbulb.ext import tasks
-from pytz import utc
 
 from .. import cfg, utils
 from ..bot import CachedFetchBot
@@ -29,21 +25,12 @@ from . import autocmd
 FOLLOWABLE_CHANNEL = cfg.followables["weekly_reset"]
 
 
-def weekly_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
-    now = now or dt.datetime.now(tz=utc) - dt.timedelta(hours=17)
-    now = dt.datetime(now.year, now.month, now.day, 17, 0, 0, tzinfo=utc)
-    start = now - dt.timedelta(days=(now.weekday() - 1) % 7)
-    # Ends at the same day and time next week
-    end = start + dt.timedelta(days=7)
-    return start, end
-
-
 @tasks.task(m=1, auto_start=True, wait_before_execution=False, pass_app=True)
 async def refresh_weekly_reset_data(bot: CachedFetchBot) -> None:
     global weekly_reset_message_kwargs
 
     messages = await autocmd.pull_messages_from_channel(
-        bot, after=weekly_reset_period()[0], channel_id=FOLLOWABLE_CHANNEL
+        bot, after=utils.weekly_reset_period()[0], channel_id=FOLLOWABLE_CHANNEL
     )
 
     msg_proto = autocmd.MessagePrototype()
