@@ -163,6 +163,15 @@ def weekly_reset_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
     return start, end
 
 
+def xur_period(now: dt.datetime = None) -> t.Tuple[dt.datetime]:
+    now = (now or dt.datetime.now(tz=dt.timezone.utc)) - dt.timedelta(hours=17)
+    now = dt.datetime(now.year, now.month, now.day, 17, 0, 0, tzinfo=dt.timezone.utc)
+    start = now - dt.timedelta(days=(now.weekday() + 3) % 7)
+    # Ends at the same day and time next week
+    end = start + dt.timedelta(days=7)
+    return start, end
+
+
 def get_ordinal_suffix(day: int) -> str:
     return (
         {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
