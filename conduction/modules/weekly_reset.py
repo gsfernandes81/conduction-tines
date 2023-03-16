@@ -13,42 +13,40 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import datetime as dt
+import typing as t
+
 import hikari as h
 import lightbulb as lb
-from lightbulb.ext import tasks
 
 from .. import cfg, utils
-from ..bot import CachedFetchBot
+from .autocmd import MessagePrototype, NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
-from . import autocmd
 
 FOLLOWABLE_CHANNEL = cfg.followables["weekly_reset"]
 
 
-@tasks.task(m=1, auto_start=True, wait_before_execution=False, pass_app=True)
-async def refresh_weekly_reset_data(bot: CachedFetchBot) -> None:
-    global weekly_reset_message_kwargs
+class ResetPages(NavPages):
+    @classmethod
+    def preprocess_messages(
+        cls, messages: t.List[MessagePrototype | h.Message]
+    ) -> MessagePrototype:
+        return (
+            utils.accumulate([MessagePrototype.from_message(m) for m in messages])
+            .merge_content_into_embed()
+            .merge_attachements_into_embed()
+        )
 
-    messages = await autocmd.pull_messages_from_channel(
-        bot, after=utils.weekly_reset_period()[0], channel_id=FOLLOWABLE_CHANNEL
+    @classmethod
+    def period_around(cls, date: dt.datetime | None = None) -> t.Tuple[h.Snowflake]:
+        return utils.weekly_reset_period(date)
+
+
+async def on_start(event: h.StartedEvent):
+    global reset_pages
+    reset_pages = await ResetPages.from_channel(
+        event.app, FOLLOWABLE_CHANNEL, history_len=12
     )
-
-    msg_proto = autocmd.MessagePrototype()
-    for message_no, message in enumerate(messages):
-        msg_proto = msg_proto + autocmd.MessagePrototype.from_message(message)
-
-    msg_proto.merge_content_into_embed()
-    msg_proto.merge_attachements_into_embed(designator=message_no)
-
-    weekly_reset_message_kwargs = msg_proto.to_message_kwargs()
-
-
-async def get_basic_weekly_reset_embed():
-    return h.Embed(
-        title="Weekly Reset",
-        url=await utils.follow_link_single_step("https://kyberscorner.com/"),
-        color=cfg.default_embed_color,
-    ).set_image("https://kyber3000.com/Reset")
 
 
 @lb.command("weekly", "Weekly reset")
@@ -61,19 +59,13 @@ async def weekly_reset_command_group(ctx: lb.Context):
 @lb.command("reset", "Find out about this weeks reset")
 @lb.implements(lb.SlashSubCommand)
 async def weekly_reset_command(ctx: lb.Context):
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-
-    try:
-        await ctx.respond(**weekly_reset_message_kwargs)
-    except NameError:
-        await ctx.respond(await get_basic_weekly_reset_embed())
+    navigator = NavigatorView(pages=reset_pages, timeout=60)
+    await navigator.send(ctx.interaction)
 
 
 def register(bot):
-    for command in [
-        weekly_reset_command_group,
-    ]:
-        bot.command(command)
+    bot.command(weekly_reset_command_group)
+    bot.listen()(on_start)
 
     autopost_command_group.child(
         follow_control_command_maker(
