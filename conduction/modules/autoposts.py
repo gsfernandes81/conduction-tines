@@ -199,6 +199,7 @@ def follow_control_command_maker(
                             icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                         )
                     )
+                    return
                 else:
                     raise e
         except Exception as e:
