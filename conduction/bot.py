@@ -119,6 +119,10 @@ class UserCommandBot(lb.BotApp):
         super().__init__(*args, **kwargs)
         self._user_command_schema = user_command_schema
 
+        @self.listen()
+        async def _on_start(event: h.StartingEvent):
+            await self.sync_schema_to_bot_cmds()
+
     def is_existing_command(self, *ln_names) -> bool:
         """Check if a command is registered with a bot,
 
