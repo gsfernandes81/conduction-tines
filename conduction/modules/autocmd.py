@@ -213,7 +213,7 @@ class MessagePrototype:
     def from_message(cls, message: h.Message) -> t.Self:
         """Create a MessagePrototype instance from a message."""
         return cls(
-            content=message.content,
+            content=message.content or "",
             embeds=message.embeds,
             attachments=message.attachments,
         )
