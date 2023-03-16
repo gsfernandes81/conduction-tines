@@ -143,7 +143,6 @@ async def check_invoker_has_perms(
 async def check_invoker_is_owner(ctx: lb.Context):
     bot: lb.BotApp = ctx.bot
     invoker = ctx.author
-    logging.error(str(await bot.fetch_owner_ids()))
     return invoker.id in await bot.fetch_owner_ids()
 
 
