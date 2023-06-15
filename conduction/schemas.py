@@ -18,11 +18,11 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 from collections import defaultdict
-from typing import List
+from typing import List, Optional
 
 import regex as re
 from pytz import utc
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import (
     declarative_base,
     declarative_mixin,
@@ -31,7 +31,6 @@ from sqlalchemy.orm import (
     validates,
 )
 from sqlalchemy.sql.expression import and_, delete, select, update
-from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.functions import func
 from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
 from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Integer, String, Text
@@ -89,7 +88,13 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def add_mirror(cls, src_id: int, dest_id: int, legacy: bool, session=None):
+    async def add_mirror(
+        cls,
+        src_id: int,
+        dest_id: int,
+        legacy: bool,
+        session: Optional[AsyncSession] = None,
+    ):
         src_id = int(src_id)
         dest_id = int(dest_id)
         await session.merge(cls(src_id, dest_id, legacy))
@@ -99,7 +104,10 @@ class MirroredChannel(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def fetch_dests(
-        cls, src_id: int, legacy: bool | None = True, session=None
+        cls,
+        src_id: int,
+        legacy: bool | None = True,
+        session: Optional[AsyncSession] = None,
     ) -> List[MirroredChannel]:
         src_id = int(src_id)
         dests = (
@@ -118,7 +126,9 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def get_or_fetch_dests(cls, src_id: int, session=None) -> List[int]:
+    async def get_or_fetch_dests(
+        cls, src_id: int, session: Optional[AsyncSession] = None
+    ) -> List[int]:
         src_id = int(src_id)
         if cls._dests_cache[src_id]:
             return cls._dests_cache[src_id]
@@ -130,7 +140,10 @@ class MirroredChannel(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def fetch_srcs(
-        cls, dest_id: int, legacy: bool | None = True, session=None
+        cls,
+        dest_id: int,
+        legacy: bool | None = True,
+        session: Optional[AsyncSession] = None,
     ) -> List[MirroredChannel]:
         dest_id = int(dest_id)
         srcs = (
@@ -150,7 +163,10 @@ class MirroredChannel(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def count_dests(
-        cls, src_id: int, legacy_only: bool | None = True, session=None
+        cls,
+        src_id: int,
+        legacy_only: bool | None = True,
+        session: Optional[AsyncSession] = None,
     ) -> int:
         src_id = int(src_id)
         dests_count = (
@@ -175,7 +191,7 @@ class MirroredChannel(Base):
     async def count_total_dests(
         cls,
         legacy_only: bool | None = True,
-        session=None,
+        session: Optional[AsyncSession] = None,
     ) -> int:
         dests_count = (
             await session.execute(
@@ -192,7 +208,11 @@ class MirroredChannel(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def set_legacy(
-        cls, src_id: int, dest_id: int, legacy: bool = True, session=None
+        cls,
+        src_id: int,
+        dest_id: int,
+        legacy: bool = True,
+        session: Optional[AsyncSession] = None,
     ) -> None:
         src_id = int(src_id)
         dest_id = int(dest_id)
@@ -208,7 +228,9 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def remove_mirror(cls, src_id: int, dest_id: int, session=None) -> None:
+    async def remove_mirror(
+        cls, src_id: int, dest_id: int, session: Optional[AsyncSession] = None
+    ) -> None:
         src_id = int(src_id)
         dest_id = int(dest_id)
         await session.execute(
@@ -221,7 +243,9 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def remove_all_mirrors(cls, dest_id: int, session=None) -> None:
+    async def remove_all_mirrors(
+        cls, dest_id: int, session: Optional[AsyncSession] = None
+    ) -> None:
         dest_id = int(dest_id)
         src_ids = await cls.fetch_srcs(dest_id)
         await session.execute(delete(cls).where(and_(cls.dest_id == dest_id)))
@@ -264,7 +288,7 @@ class MirroredMessage(Base):
         dest_channel: int,
         source_msg: int,
         source_channel: int,
-        session=None,
+        session: Optional[AsyncSession] = None,
     ):
         """Create a session, begin it and add a message pair"""
         dest_msg = int(dest_msg)
@@ -280,7 +304,7 @@ class MirroredMessage(Base):
     async def get_dest_msgs_and_channels(
         cls,
         source_msg: int,
-        session=None,
+        session: Optional[AsyncSession] = None,
     ):
         """Return dest message and channel ids from source message id"""
         source_msg = int(source_msg)
@@ -298,7 +322,9 @@ class MirroredMessage(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def prune(
-        cls, age: None | dt.timedelta = dt.timedelta(days=21), session=None
+        cls,
+        age: None | dt.timedelta = dt.timedelta(days=21),
+        session: Optional[AsyncSession] = None,
     ):
         """Delete entries older than <age>"""
         await session.execute(
@@ -375,7 +401,9 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_commands(cls, session=None) -> List[UserCommand]:
+    async def fetch_commands(
+        cls, session: Optional[AsyncSession] = None
+    ) -> List[UserCommand]:
         commands = (
             await session.execute(select(cls).where(cls.response_type != 0))
         ).fetchall()
@@ -385,7 +413,9 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_command_groups(cls, session=None) -> List[UserCommand]:
+    async def fetch_command_groups(
+        cls, session: Optional[AsyncSession] = None
+    ) -> List[UserCommand]:
         commands = (
             await session.execute(
                 select(cls)
@@ -399,7 +429,9 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_command(cls, *ln_names, session=None) -> UserCommand:
+    async def fetch_command(
+        cls, *ln_names, session: Optional[AsyncSession] = None
+    ) -> UserCommand:
         utils.check_number_of_layers(ln_names)
 
         # Pad ln_names with "" up to len 3
@@ -421,7 +453,9 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_command_group(cls, *ln_names, session=None) -> UserCommand:
+    async def fetch_command_group(
+        cls, *ln_names, session: Optional[AsyncSession] = None
+    ) -> UserCommand:
         if len(ln_names) >= 3:
             raise utils.FriendlyValueError(
                 "Discord does not support slash command groups more than "
@@ -449,7 +483,7 @@ class UserCommand(Base):
     @classmethod
     @utils.ensure_session(db_session)
     async def _autocomplete(
-        cls, l1_name="", l2_name="", l3_name="", session=None
+        cls, l1_name="", l2_name="", l3_name="", session: Optional[AsyncSession] = None
     ) -> List[List[str]]:
         completions = (
             await session.execute(
@@ -472,7 +506,7 @@ class UserCommand(Base):
         description: str,
         response_type: int,
         response_data: str,
-        session=None,
+        session: Optional[AsyncSession] = None,
     ):
         utils.check_number_of_layers(ln_names)
         await cls.check_parent_command_groups_exist(*ln_names, session=session)
@@ -495,7 +529,9 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def add_command_group(cls, *ln_names, description, session=None):
+    async def add_command_group(
+        cls, *ln_names, description, session: Optional[AsyncSession] = None
+    ):
         return await cls.add_command(
             *ln_names,
             description=description,
@@ -511,7 +547,7 @@ class UserCommand(Base):
         l1_name: str,
         l2_name: str = "",
         l3_name: str = "",
-        session=None,
+        session: Optional[AsyncSession] = None,
     ):
         """Check if the parent command groups exist
 
@@ -564,7 +600,9 @@ class UserCommand(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def fetch_subcommands(cls, l1_name, l2_name: str = "", session=None):
+    async def fetch_subcommands(
+        cls, l1_name, l2_name: str = "", session: Optional[AsyncSession] = None
+    ):
         return (
             await session.execute(
                 select(cls).where(
@@ -588,7 +626,7 @@ class UserCommand(Base):
         l2_name: str = "",
         l3_name: str = "",
         fetch_deleted: bool = True,
-        session=None,
+        session: Optional[AsyncSession] = None,
     ) -> UserCommand:
         commands_to_delete = (
             (
@@ -627,7 +665,7 @@ class UserCommand(Base):
         l2_name: str = "",
         cascade: bool = False,
         fetch_deleted: bool = True,
-        session=None,
+        session: Optional[AsyncSession] = None,
     ) -> List[UserCommand]:
         subcommands = await cls.fetch_subcommands(l1_name, l2_name, session=session)
         if subcommands and not cascade:
@@ -704,7 +742,9 @@ class OldBaseChannelRecord:
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def get_channels(cls, session=None, enabled_only: bool = True):
+    async def get_channels(
+        cls, session: Optional[AsyncSession] = None, enabled_only: bool = True
+    ):
         """Get all channels in the table"""
         if enabled_only:
             channels = (

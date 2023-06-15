@@ -17,13 +17,14 @@ import logging
 import traceback as tb
 import typing as t
 from random import randint
+from typing import Optional
 
 import hikari as h
 import lightbulb as lb
 
 from .. import cfg, utils
 from ..bot import CachedFetchBot, UserCommandBot
-from ..schemas import MirroredChannel, db_session
+from ..schemas import AsyncSession, MirroredChannel, db_session
 
 # Permissions that allow users to manage autoposts in a guild
 end_user_allowed_perms = (
@@ -74,14 +75,15 @@ def follow_control_command_maker(
     @lb.command(autoposts_name, autoposts_desc, pass_options=True)
     @lb.implements(lb.SlashSubCommand)
     @utils.ensure_session(db_session)
-    async def follow_control(ctx: lb.Context, option: int, session=None):
+    async def follow_control(
+        ctx: lb.Context, option: int, session: Optional[AsyncSession] = None
+    ):
         option = bool(option)
         bot: t.Union[CachedFetchBot, UserCommandBot] = ctx.bot
         # Defer the response manually, as auto defer is bugged for subcommands
         await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
 
         try:
-
             if not (
                 await utils.check_invoker_is_owner(ctx)
                 or await utils.check_invoker_has_perms(ctx, end_user_allowed_perms)

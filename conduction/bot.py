@@ -181,7 +181,9 @@ class UserCommandBot(lb.BotApp):
         return command_group
 
     @utils.ensure_session(schemas.db_session)
-    async def sync_schema_to_bot_cmds(self, session=None):
+    async def sync_schema_to_bot_cmds(
+        self, session: t.Optional[schemas.AsyncSession] = None
+    ):
         """Sync commands from schema in db to the bot"""
 
         # Remove all commands and command groups that are schema based
@@ -205,7 +207,9 @@ class UserCommandBot(lb.BotApp):
         await super().sync_application_commands()
 
     @utils.ensure_session(schemas.db_session)
-    async def sync_application_commands(self, session=None) -> None:
+    async def sync_application_commands(
+        self, session: t.Optional[schemas.AsyncSession] = None
+    ) -> None:
         await self.sync_schema_to_bot_cmds(session=session)
         await self.sync_bot_cmds_to_discord()
 
