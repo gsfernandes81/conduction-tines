@@ -162,7 +162,7 @@ class MultiImageEmbedList(list):
             )
 
         for field in embed.fields:
-            multi_image_embed[0].add_field(field.name, field.value, inline=field.inline)
+            multi_image_embed[0].add_field(field.name, field.value, inline=field.is_inline)
 
         # Loop through the image URLs and create and append new embeds with different image properties
         multi_image_embed.add_images(images)
