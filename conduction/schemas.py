@@ -23,8 +23,15 @@ from typing import List
 import regex as re
 from pytz import utc
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, validates
+from sqlalchemy.orm import (
+    declarative_base,
+    declarative_mixin,
+    declared_attr,
+    sessionmaker,
+    validates,
+)
 from sqlalchemy.sql.expression import and_, delete, select, update
+from sqlalchemy.orm import declarative_mixin, declared_attr
 from sqlalchemy.sql.functions import func
 from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
 from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Integer, String, Text
@@ -32,9 +39,25 @@ from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Integer, Stri
 from . import cfg, utils
 
 Base = declarative_base()
+OldBase = declarative_base()
 db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
+
+# NOTE: Session configuration for routing to the correct DB is below:
+db_session.configure(
+    binds={
+        Base: create_async_engine(
+            cfg.db_url_async,
+            connect_args=cfg.db_connect_args,
+        ),
+        OldBase: create_async_engine(
+            cfg.legacy_db_url_async,
+            connect_args={"timeout": 120},
+            pool_pre_ping=True,
+        ),
+    }
+)
 
 rgx_cmd_name_is_valid = re.compile("^[a-z][a-z0-9_-]{1,31}$")
 rgx_sub_cmd_name_is_valid = re.compile("^[a-z]{0,1}[a-z0-9_-]{0,31}$")
@@ -141,6 +164,25 @@ class MirroredChannel(Base):
                         if legacy_only is not None
                         else True,
                     )
+                )
+            )
+        ).scalar_one()
+
+        return dests_count
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def count_total_dests(
+        cls,
+        legacy_only: bool | None = True,
+        session=None,
+    ) -> int:
+        dests_count = (
+            await session.execute(
+                select(func.count())
+                .select_from(cls)
+                .where(
+                    (cls.legacy == legacy_only) if legacy_only is not None else True,
                 )
             )
         ).scalar_one()
@@ -645,6 +687,47 @@ class UserCommand(Base):
         return [
             ln_name for ln_name in [self.l1_name, self.l2_name, self.l3_name] if ln_name
         ]
+
+
+@declarative_mixin
+class OldBaseChannelRecord:
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower()
+
+    __mapper_args__ = {"eager_defaults": True}
+
+    id = Column("id", BigInteger, primary_key=True)
+    server_id = Column("server_id", BigInteger)
+    last_msg_id = Column("last_msg_id", BigInteger)
+    enabled = Column("enabled", Boolean)
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def get_channels(cls, session=None, enabled_only: bool = True):
+        """Get all channels in the table"""
+        if enabled_only:
+            channels = (
+                await session.execute(
+                    select(cls.id, cls.enabled).where(cls.enabled == True)
+                )
+            ).fetchall()
+        else:
+            channels = (await session.execute(select(cls.id, cls.enabled))).fetchall()
+        channels = [] if channels is None else channels
+        return channels
+
+
+class LostSectorAutopostChannel(OldBaseChannelRecord, OldBase):
+    pass
+
+
+class WeeklyResetAutopostChannel(OldBaseChannelRecord, OldBase):
+    pass
+
+
+class XurAutopostChannel(OldBaseChannelRecord, OldBase):
+    pass
 
 
 async def recreate_all():

@@ -20,6 +20,7 @@ regex = "^2022.10.31"
 yarl = "^1.8.2"
 hikari-toolbox = "^0.1.5"
 hikari-miru = {git = "https://github.com/gs729/hikari-miru.git"}
+asyncpg = "^0.27.0"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"

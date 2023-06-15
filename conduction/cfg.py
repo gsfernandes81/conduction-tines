@@ -45,6 +45,12 @@ db_url = db_url[__repl_till:]
 db_url_async = "mysql+asyncmy" + db_url
 db_url = "mysql" + db_url
 
+legacy_db_url = _getenv("DATABASE_URL")
+if legacy_db_url.startswith("postgres"):
+    repl_till = legacy_db_url.find("://")
+    legacy_db_url = legacy_db_url[repl_till:]
+    legacy_db_url_async = "postgresql+asyncpg" + legacy_db_url
+
 db_session_kwargs_sync = {
     "expire_on_commit": False,
 }
@@ -77,6 +83,9 @@ embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
 embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
 control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
 control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
+ls_followable = int(_getenv("LS_FOLLOW_CHANNEL_ID"))
+xur_followable = int(_getenv("LS_FOLLOW_CHANNEL_ID"))
+reset_followable = int(_getenv("RESET_FOLLOW_CHANNEL_ID"))
 default_url = str(_getenv("DEFAULT_URL"))
 followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 log_channel = int(_getenv("LOG_CHANNEL"))
