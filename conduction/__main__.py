@@ -13,24 +13,16 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import logging
+
 import hikari as h
 import lightbulb as lb
 import miru
 from lightbulb.ext import tasks
+import logging
 
-from . import cfg, schemas, utils
+from . import cfg, modules, schemas, utils
 from .bot import CachedFetchBot, UserCommandBot
-from .modules import (
-    autoposts,
-    eververse,
-    lost_sector,
-    process_control,
-    repeater,
-    twab,
-    user_commands,
-    weekly_reset,
-    xur,
-)
 
 
 class Bot(UserCommandBot, CachedFetchBot):
@@ -52,19 +44,11 @@ async def autoupdate_status():
     )
 
 
-for module in [
-    autoposts,
-    eververse,
-    process_control,
-    repeater,
-    twab,
-    lost_sector,
-    weekly_reset,
-    xur,
-    user_commands,
-]:
-    module.register(bot)
+_modules = map(modules.__dict__.get, modules.__all__)
 
+for module in _modules:
+    logging.info(f"Loading module {module.__name__.split('.')[-1]}")
+    module.register(bot)
 
 tasks.load(bot)
 miru.install(bot)

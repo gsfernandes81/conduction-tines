@@ -31,6 +31,8 @@ from .. import utils
 from ..bot import CachedFetchBot
 from ..cfg import default_url, embed_default_color, reset_time_tolerance
 
+_no_register = True
+
 
 class SimpleEmbed(h.Embed):
     def __init__(
