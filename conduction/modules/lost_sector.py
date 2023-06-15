@@ -74,7 +74,7 @@ class SectorMessages(NavPages):
             format_dict = {
                 "month": month_name[date.month],
                 "day": date.day,
-                "sector": sector,
+                "sector": sector.to_sector_v1(),
                 "ls_url": ls_gfx_url,
             }
 
