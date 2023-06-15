@@ -162,7 +162,9 @@ class MultiImageEmbedList(list):
             )
 
         for field in embed.fields:
-            multi_image_embed[0].add_field(field.name, field.value, inline=field.is_inline)
+            multi_image_embed[0].add_field(
+                field.name, field.value, inline=field.is_inline
+            )
 
         # Loop through the image URLs and create and append new embeds with different image properties
         multi_image_embed.add_images(images)
@@ -281,7 +283,6 @@ class MessagePrototype:
     def merge_embed_url_as_embed_image_into_embed(
         self, embed_no: int = 0, designator: int = 0
     ) -> t.Self:
-
         if not self.embeds:
             self.embeds = [h.Embed(color=embed_default_color)]
 
@@ -364,7 +365,8 @@ class NavPages(dict, abc.ABC):
     def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
         """Return the MessagePrototype for the period containing <key>
 
-        If <key> is an int then it is interpreted as the number of periods after the current period."""
+        If <key> is an int then it is interpreted as the number of periods after the current period.
+        """
         if isinstance(key, int):
             key = self.index_to_date(key)
 

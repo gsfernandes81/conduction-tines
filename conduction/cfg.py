@@ -56,6 +56,7 @@ ssl_ctx = ssl.create_default_context(cafile="/etc/ssl/certs/ca-certificates.crt"
 ssl_ctx.verify_mode = ssl.CERT_REQUIRED
 db_connect_args = {"ssl": ssl_ctx}
 
+
 # Google sheets
 gsheets_credentials = {
     "type": "service_account",
