@@ -170,30 +170,30 @@ def follow_control_command_maker(
 
                     # Check if this is a legacy mirror, and if so, remove it and return
                     if int(ctx.channel_id) in (
-                        await MirroredChannel.get_or_fetch_dests(followable_channel),
+                        await MirroredChannel.get_or_fetch_dests(followable_channel)
                     ):
                         await MirroredChannel.remove_mirror(
                             followable_channel, ctx.channel_id, session=session
                         )
-                        return
 
-                    # If this is not a legacy mirror, then we need to delete the webhook for it
+                    else:
+                        # If this is not a legacy mirror, then we need to delete the webhook for it
 
-                    # Fetch and delete follow based webhooks and filter for our channel as a
-                    # source
-                    for hook in await bot.rest.fetch_channel_webhooks(
-                        await bot.fetch_channel(ctx.channel_id)
-                    ):
-                        if (
-                            isinstance(hook, h.ChannelFollowerWebhook)
-                            and hook.source_channel.id == followable_channel
+                        # Fetch and delete follow based webhooks and filter for our channel as a
+                        # source
+                        for hook in await bot.rest.fetch_channel_webhooks(
+                            await bot.fetch_channel(ctx.channel_id)
                         ):
-                            await bot.rest.delete_webhook(hook)
+                            if (
+                                isinstance(hook, h.ChannelFollowerWebhook)
+                                and hook.source_channel.id == followable_channel
+                            ):
+                                await bot.rest.delete_webhook(hook)
 
-                    # Also remove the mirror
-                    await MirroredChannel.remove_mirror(
-                        followable_channel, ctx.channel_id, session=session
-                    )
+                        # Also remove the mirror
+                        await MirroredChannel.remove_mirror(
+                            followable_channel, ctx.channel_id, session=session
+                        )
 
             except h.ForbiddenError as e:
                 if (
