@@ -103,7 +103,7 @@ def follow_control_command_maker(
                         + "Feel free to contact me on discord if you are having issues!\n",
                         color=cfg.embed_error_color,
                     ).set_footer(
-                        f"{bot_owner.username}#{bot_owner.discriminator}",
+                        f"@{bot_owner.username}",
                         icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                     )
                 )
@@ -123,7 +123,7 @@ def follow_control_command_maker(
                         description="This command does not support forum channels and threads",
                         color=cfg.embed_error_color,
                     ).set_footer(
-                        f"{bot_owner.username}#{bot_owner.discriminator}",
+                        f"@{bot_owner.username}",
                         icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                     )
                 )
@@ -217,7 +217,7 @@ def follow_control_command_maker(
                             + "If you are still having issues, please contact me on discord!\n",
                             color=cfg.embed_error_color,
                         ).set_footer(
-                            f"{bot_owner.username}#{bot_owner.discriminator}",
+                            f"@{bot_owner.username}",
                             icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                         )
                     )
@@ -237,7 +237,7 @@ def follow_control_command_maker(
                     + "for you.",
                     color=cfg.embed_error_color,
                 ).set_footer(
-                    f"{bot_owner.username}#{bot_owner.discriminator}",
+                    f"@{bot_owner.username}",
                     icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
                 )
             )
