@@ -18,8 +18,8 @@ import logging
 import hikari as h
 import lightbulb as lb
 import miru
+import uvloop
 from lightbulb.ext import tasks
-import logging
 
 from . import cfg, modules, schemas, utils
 from .bot import CachedFetchBot, UserCommandBot
@@ -27,6 +27,9 @@ from .bot import CachedFetchBot, UserCommandBot
 
 class Bot(UserCommandBot, CachedFetchBot):
     pass
+
+
+uvloop.install()
 
 
 bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
