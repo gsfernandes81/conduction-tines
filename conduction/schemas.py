@@ -78,13 +78,15 @@ class MirroredChannel(Base):
     src_id = Column("src_id", BigInteger, primary_key=True)
     dest_id = Column("dest_id", BigInteger, primary_key=True)
     legacy = Column("legacy", Boolean)
+    enabled = Column("enabled", Boolean, default=True)
     _dests_cache = defaultdict(list)
 
-    def __init__(self, src_id: int, dest_id: int, legacy: bool):
+    def __init__(self, src_id: int, dest_id: int, legacy: bool, enabled: bool):
         super().__init__()
         self.src_id = int(src_id)
         self.dest_id = int(dest_id)
         self.legacy = bool(legacy)
+        self.enabled = bool(enabled)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -93,12 +95,13 @@ class MirroredChannel(Base):
         src_id: int,
         dest_id: int,
         legacy: bool,
+        enabled: bool = True,
         session: Optional[AsyncSession] = None,
     ):
         src_id = int(src_id)
         dest_id = int(dest_id)
-        await session.merge(cls(src_id, dest_id, legacy))
-        if legacy and dest_id not in cls._dests_cache[src_id]:
+        await session.merge(cls(src_id, dest_id, legacy, enabled=enabled))
+        if legacy and enabled and dest_id not in cls._dests_cache[src_id]:
             cls._dests_cache[src_id].append(dest_id)
 
     @classmethod
@@ -107,8 +110,15 @@ class MirroredChannel(Base):
         cls,
         src_id: int,
         legacy: bool | None = True,
+        enabled: bool | None = True,
         session: Optional[AsyncSession] = None,
     ) -> List[MirroredChannel]:
+        """Fetch all dests for a given src_id
+
+        src_id -> The source channel ID
+        legacy -> True: Fetch legacy only, False: Fetch non-legacy only, None: Fetch all
+        enabled -> True: Fetch enabled only, False: Fetch disabled only, None: Fetch all
+        """
         src_id = int(src_id)
         dests = (
             await session.execute(
@@ -116,6 +126,7 @@ class MirroredChannel(Base):
                     and_(
                         cls.src_id == src_id,
                         (cls.legacy == legacy) if legacy is not None else True,
+                        (cls.enabled == enabled) if enabled is not None else True,
                     )
                 )
             )
@@ -143,6 +154,7 @@ class MirroredChannel(Base):
         cls,
         dest_id: int,
         legacy: bool | None = True,
+        enabled: bool | None = True,
         session: Optional[AsyncSession] = None,
     ) -> List[MirroredChannel]:
         dest_id = int(dest_id)
@@ -152,6 +164,7 @@ class MirroredChannel(Base):
                     and_(
                         cls.dest_id == dest_id,
                         (cls.legacy == legacy) if legacy is not None else True,
+                        (cls.enabled == enabled) if enabled is not None else True,
                     )
                 )
             )
@@ -234,7 +247,11 @@ class MirroredChannel(Base):
         src_id = int(src_id)
         dest_id = int(dest_id)
         await session.execute(
-            delete(cls).where(and_(cls.src_id == src_id, cls.dest_id == dest_id))
+            update(cls)
+            .where(
+                and_(cls.src_id == src_id, cls.dest_id == dest_id, cls.enabled == True)
+            )
+            .values(enabled=False)
         )
         try:
             cls._dests_cache[src_id].remove(dest_id)
@@ -248,7 +265,11 @@ class MirroredChannel(Base):
     ) -> None:
         dest_id = int(dest_id)
         src_ids = await cls.fetch_srcs(dest_id)
-        await session.execute(delete(cls).where(and_(cls.dest_id == dest_id)))
+        await session.execute(
+            update(cls)
+            .where(and_(cls.dest_id == dest_id, cls.enabled == True))
+            .values(enabled=False)
+        )
         for src_id in src_ids:
             try:
                 cls._dests_cache[src_id].remove(dest_id)
