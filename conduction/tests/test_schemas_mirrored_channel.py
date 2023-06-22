@@ -18,15 +18,22 @@ import asyncio
 import pytest
 from .. import schemas
 
-from ..schemas import MirroredChannel
+from ..schemas import MirroredChannel as _MirroredChannel
 
 
 def setup_function():
     asyncio.run(schemas.recreate_all())
 
 
+@pytest.fixture()
+def MirroredChannel():
+    # Clear the cache before each test
+    _MirroredChannel._dests_cache.clear()
+    yield _MirroredChannel
+
+
 @pytest.mark.asyncio
-async def test_add_and_fetch_mirror():
+async def test_add_and_fetch_mirror(MirroredChannel):
     src_id = 0
     dest_id = 1
     dest_id_2 = 2
@@ -83,7 +90,7 @@ async def test_add_and_fetch_mirror():
 
 
 @pytest.mark.asyncio
-async def test_remove_mirror():
+async def test_remove_mirror(MirroredChannel):
     src_id = 0
     dest_id = 1
     dest_id_2 = 2
@@ -101,7 +108,7 @@ async def test_remove_mirror():
 
 
 @pytest.mark.asyncio
-async def test_remove_all_mirrors():
+async def test_remove_all_mirrors(MirroredChannel):
     src_id = 0
     src_id_2 = 1
     dest_id = 2
@@ -119,7 +126,7 @@ async def test_remove_all_mirrors():
 
 
 @pytest.mark.asyncio
-async def test_add_duplicate_mirror():
+async def test_add_duplicate_mirror(MirroredChannel):
     # Note, this should not raise an error since
     # add_mirror uses merge instead of add
     src_id = 0
@@ -140,7 +147,7 @@ async def test_add_duplicate_mirror():
 
 
 @pytest.mark.asyncio
-async def test_count_dests():
+async def test_count_dests(MirroredChannel):
     src_id = 0
     src_id_2 = 1
     dest_id = 2
