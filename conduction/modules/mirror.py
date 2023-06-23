@@ -54,7 +54,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     and h.MessageFlag.CROSSPOSTED in e.message.flags,
                 )
                 logging.info(
-                    f"Crosspost event received for messge in in <#{msg.channel_id}>, "
+                    f"Crosspost event received for message in in <#{msg.channel_id}>, "
                     + "continuing..."
                 )
         except TimeoutError:
