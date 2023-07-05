@@ -15,7 +15,9 @@
 
 import json
 import logging
-from asyncio import sleep, TimeoutError
+from asyncio import Semaphore, TimeoutError, gather, sleep
+from types import TracebackType
+from typing import Any, Coroutine, Type
 
 import hikari as h
 import lightbulb as lb
@@ -23,6 +25,32 @@ import lightbulb as lb
 from .. import utils
 from ..bot import CachedFetchBot
 from ..schemas import MirroredChannel, MirroredMessage, db_session
+
+
+class TimedSemaphore(Semaphore):
+    """Semaphore to ensure no more than value requests per period are made
+
+    This is to stay well within discord api rate limits while avoiding errors"""
+
+    def __init__(self, value: int = 30, period=1):
+        super().__init__(value)
+        self.period = period
+
+    async def release(self) -> None:
+        """Delay release until period has passed"""
+        await sleep(self.period)
+        return super().release()
+
+    async def __aexit__(
+        self,
+        exc_type: Type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> Coroutine[Any, Any, None]:
+        return await self.release()
+
+
+discord_api_semaphore = TimedSemaphore()
 
 
 async def message_create_repeater(event: h.MessageCreateEvent):
@@ -67,8 +95,10 @@ async def message_create_repeater(event: h.MessageCreateEvent):
             break
 
     async with db_session() as session:
-        for mirror_ch_id in mirrors:
-            async with session.begin():
+        async with session.begin():
+
+            async def kernel(mirror_ch_id: int):
+                logging.info(f"Mirroring message to <#{mirror_ch_id}>")
                 for _ in range(3):  # Retry 3 times at most
                     try:
                         channel: h.TextableChannel = await bot.fetch_channel(
@@ -79,13 +109,14 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                             # Ignore non textable channels
                             continue
 
-                        # Send the message
-                        mirrored_msg = await channel.send(
-                            msg.content,
-                            attachments=msg.attachments,
-                            components=msg.components,
-                            embeds=msg.embeds,
-                        )
+                        async with discord_api_semaphore:
+                            # Send the message
+                            mirrored_msg = await channel.send(
+                                msg.content,
+                                attachments=msg.attachments,
+                                components=msg.components,
+                                embeds=msg.embeds,
+                            )
                     except Exception as e:
                         logging.error(
                             f"Retrying message send in {mirror_ch_id} due to error:"
@@ -98,7 +129,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     logging.error(
                         "Failed to send message in {mirror_ch_id} after 3 tries"
                     )
-                    break
+                    return
                 # Record the ids in the db
                 await MirroredMessage.add_msg(
                     dest_msg=mirrored_msg.id,
@@ -107,6 +138,11 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     source_channel=event.channel_id,
                     session=session,
                 )
+
+            await gather(
+                *[kernel(mirror_ch_id) for mirror_ch_id in mirrors],
+                return_exceptions=True,
+            )
 
 
 async def message_update_repeater(event: h.MessageUpdateEvent):
@@ -130,16 +166,18 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
         else:
             break
 
-    for msg_id, channel_id in msgs_to_update:
+    async def kernel(msg_id: int, channel_id: int):
         for _ in range(3):  # Retry 3 times at most
             try:
-                dest_msg = await bot.fetch_message(channel_id, msg_id)
-                await dest_msg.edit(
-                    msg.content,
-                    attachments=msg.attachments,
-                    components=msg.components,
-                    embeds=msg.embeds,
-                )
+                async with discord_api_semaphore:
+                    dest_msg = await bot.fetch_message(channel_id, msg_id)
+                async with discord_api_semaphore:
+                    await dest_msg.edit(
+                        msg.content,
+                        attachments=msg.attachments,
+                        components=msg.components,
+                        embeds=msg.embeds,
+                    )
             except Exception as e:
                 utils.discord_error_logger(bot, e)
             else:
@@ -148,6 +186,11 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             logging.error(
                 f"Failed to update message {msg_id} in {channel_id} after 3 tries"
             )
+
+    await gather(
+        *[kernel(msg_id, channel_id) for msg_id, channel_id in msgs_to_update],
+        return_exceptions=True,
+    )
 
 
 @lb.command(name="repeater", description="Repeater control commands")
