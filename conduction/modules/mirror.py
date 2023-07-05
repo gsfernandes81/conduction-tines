@@ -88,7 +88,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
         except TimeoutError:
             break
         except Exception as e:
-            utils.discord_error_logger(bot, e)
+            await utils.discord_error_logger(bot, e)
             await sleep(backoff_timer)
             backoff_timer += 30 / backoff_timer
         else:
@@ -121,7 +121,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         logging.error(
                             f"Retrying message send in {mirror_ch_id} due to error:"
                         )
-                        utils.discord_error_logger(bot, e)
+                        await utils.discord_error_logger(bot, e)
                         continue
                     else:
                         break
@@ -160,7 +160,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             msgs_to_update = await MirroredMessage.get_dest_msgs_and_channels(msg.id)
 
         except Exception as e:
-            utils.discord_error_logger(bot, e)
+            await utils.discord_error_logger(bot, e)
             await sleep(backoff_timer)
             backoff_timer += 30 / backoff_timer
         else:
@@ -179,7 +179,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                         embeds=msg.embeds,
                     )
             except Exception as e:
-                utils.discord_error_logger(bot, e)
+                await utils.discord_error_logger(bot, e)
             else:
                 break
         else:
