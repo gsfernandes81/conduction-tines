@@ -98,7 +98,6 @@ async def message_create_repeater(event: h.MessageCreateEvent):
         async with session.begin():
 
             async def kernel(mirror_ch_id: int):
-                logging.info(f"Mirroring message to <#{mirror_ch_id}>")
                 for _ in range(3):  # Retry 3 times at most
                     try:
                         channel: h.TextableChannel = await bot.fetch_channel(
