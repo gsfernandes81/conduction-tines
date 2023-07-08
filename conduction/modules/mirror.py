@@ -13,17 +13,14 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
-import json
 import logging
 from asyncio import Semaphore, TimeoutError, gather, sleep
 from types import TracebackType
 from typing import Any, Coroutine, Type
 
 import hikari as h
-import lightbulb as lb
 
 from .. import utils
-from ..bot import CachedFetchBot
 from ..schemas import MirroredChannel, MirroredMessage, db_session
 
 
@@ -192,53 +189,9 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
     )
 
 
-@lb.command(name="repeater", description="Repeater control commands")
-@lb.implements(lb.SlashCommandGroup)
-async def repeater_control_group(ctx: lb.Context):
-    pass
-
-
-@repeater_control_group.child
-@lb.option("data", "JSON data to import", str)
-@lb.command("json_import", "Add a channels to repeater from json", pass_options=True)
-@lb.implements(lb.SlashSubCommand)
-async def from_json(ctx: lb.Context, data: str):
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
-        return
-
-    data = json.loads(data, parse_int=int)
-    bot: CachedFetchBot = ctx.bot
-
-    async with db_session() as session:
-        async with session.begin():
-            for source, dests in data.items():
-                for dest in dests:
-                    await MirroredChannel.add_mirror(
-                        int(source),
-                        int(dest),
-                        legacy=True,
-                        session=session,
-                    )
-
-    await ctx.respond(
-        "Added mirrors to repeater:\n```\n"
-        + "\n".join(
-            [
-                f"{(await bot.fetch_channel(src_id)).name}: "
-                + f"{await MirroredChannel.count_dests(src_id)} mirrors"
-                for src_id in data.keys()
-            ]
-        )
-        + "\n```"
-    )
-
-
 def register(bot):
     for event_handler in [
         message_create_repeater,
         message_update_repeater,
     ]:
         bot.listen()(event_handler)
-
-    bot.command(repeater_control_group)
