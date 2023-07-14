@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 from collections import defaultdict
-from typing import List, Optional
+from typing import List, Optional, Self
 
 import regex as re
 from pytz import utc
@@ -79,6 +79,10 @@ class MirroredChannel(Base):
     dest_id = Column("dest_id", BigInteger, primary_key=True)
     legacy = Column("legacy", Boolean)
     enabled = Column("enabled", Boolean, default=True)
+    legacy_error_rate = Column("legacy_error_rate", Integer, default=0)
+    legacy_disable_for_failure_on_date = Column(
+        "legacy_disable_for_failure_on_date", DateTime, default=None
+    )
     _dests_cache = defaultdict(list)
 
     def __init__(self, src_id: int, dest_id: int, legacy: bool, enabled: bool):
@@ -275,6 +279,117 @@ class MirroredChannel(Base):
                 cls._dests_cache[src_id].remove(dest_id)
             except ValueError:
                 pass
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def log_legacy_mirror_success(
+        cls, src_id: int, dest_id: int, session: Optional[AsyncSession] = None
+    ) -> None:
+        """Log the successful use of a mirror
+
+        In case of a successful mirror, the error rate is set to 0
+        """
+        src_id = int(src_id)
+        dest_id = int(dest_id)
+        await session.execute(
+            update(cls)
+            .where(
+                and_(
+                    cls.src_id == src_id,
+                    cls.dest_id == dest_id,
+                    cls.enabled == True,
+                    cls.legacy == True,
+                )
+            )
+            .values(legacy_error_rate=0)
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def log_legacy_mirror_failure(
+        cls, src_id: int, dest_id: int, session: Optional[AsyncSession] = None
+    ) -> None:
+        """Log the failure of a mirror
+
+        In case of a failure, the error rate is increased by 1
+        """
+        src_id = int(src_id)
+        dest_id = int(dest_id)
+        await session.execute(
+            update(cls)
+            .where(
+                and_(
+                    cls.src_id == src_id,
+                    cls.dest_id == dest_id,
+                    cls.enabled == True,
+                    cls.legacy == True,
+                )
+            )
+            .values(legacy_error_rate=cls.legacy_error_rate + 1)
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def get_legacy_failing_mirrors(
+        cls,
+        threshold: int = 7,
+        session: Optional[AsyncSession] = None,
+    ) -> Self:
+        """Return mirrors that have failed too many times
+
+        Mirrors that have failed more than `threshold` times are disabled
+        """
+        disabled_mirrors = await session.execute(
+            select(cls.src_id, cls.dest_id).where(
+                and_(
+                    cls.enabled == True,
+                    cls.legacy == True,
+                    cls.legacy_error_rate >= threshold,
+                )
+            )
+        )
+        disabled_mirrors = disabled_mirrors if disabled_mirrors else []
+        disabled_mirrors = disabled_mirrors.fetchall()
+
+        return disabled_mirrors
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def disable_legacy_failing_mirrors(
+        cls,
+        threshold: int = 7,
+        session: Optional[AsyncSession] = None,
+    ) -> Self:
+        """Disable mirrors that have failed too many times
+
+        Mirrors that have failed more than `threshold` times are disabled
+        Returns the disabled mirrors
+        """
+        mirrors_to_disable = await cls.get_legacy_failing_mirrors(
+            threshold=threshold, session=session
+        )
+        await session.execute(
+            update(cls)
+            .where(
+                and_(
+                    cls.src_id.in_([mirror[0] for mirror in mirrors_to_disable]),
+                    cls.dest_id.in_([mirror[1] for mirror in mirrors_to_disable]),
+                )
+            )
+            .values(
+                enabled=False,
+                legacy_disable_for_failure_on_date=dt.datetime.now(tz=dt.timezone.utc),
+            )
+        )
+
+        # Remove disabled mirrors from the cache
+        for src_id, dest_id in mirrors_to_disable:
+            try:
+                cls._dests_cache[src_id].remove(dest_id)
+            except ValueError:
+                pass
+
+        return mirrors_to_disable
 
 
 class MirroredMessage(Base):

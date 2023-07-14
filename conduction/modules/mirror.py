@@ -20,7 +20,7 @@ from typing import Any, Coroutine, Type
 
 import hikari as h
 
-from .. import utils
+from .. import utils, cfg
 from ..schemas import MirroredChannel, MirroredMessage, db_session
 
 
@@ -123,9 +123,14 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         break
                 else:
                     logging.error(
-                        "Failed to send message in {mirror_ch_id} after 3 tries"
+                        f"Failed to send message in {mirror_ch_id} after 3 tries"
+                    )
+                    # Log failure in case auto disable is needed
+                    await MirroredChannel.log_legacy_mirror_failure(
+                        msg.channel_id, mirror_ch_id, session=session
                     )
                     return
+
                 # Record the ids in the db
                 await MirroredMessage.add_msg(
                     dest_msg=mirrored_msg.id,
@@ -135,10 +140,34 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     session=session,
                 )
 
+                # Log success to prevent auto disable
+                await MirroredChannel.log_legacy_mirror_success(
+                    msg.channel_id, mirror_ch_id, session
+                )
+
             await gather(
                 *[kernel(mirror_ch_id) for mirror_ch_id in mirrors],
                 return_exceptions=True,
             )
+
+            # Auto disable persistently failing mirrors
+            if cfg.disable_bad_channels:
+                disabled_mirrors = await MirroredChannel.disable_legacy_failing_mirrors(
+                    session=session
+                )
+
+            if disabled_mirrors:
+                logging.warning(
+                    ("Disabled " if cfg.disable_bad_channels else "Would disable ")
+                    + str(len(disabled_mirrors))
+                    + " mirrors: "
+                    + ", ".join(
+                        [
+                            f"{mirror.src_id}: {mirror.dest_id}"
+                            for mirror in disabled_mirrors
+                        ]
+                    )
+                )
 
 
 async def message_update_repeater(event: h.MessageUpdateEvent):

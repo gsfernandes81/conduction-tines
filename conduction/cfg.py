@@ -91,6 +91,8 @@ followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 log_channel = int(_getenv("LOG_CHANNEL"))
 # Minutes of buffer, search messages this many minutes earlier
 reset_time_tolerance = dt.timedelta(minutes=60)
+# Whether to disable repeatedly failing legacy mirrors
+disable_bad_channels = str(_getenv("DISABLE_BAD_CHANNELS")).lower() == "true"
 
 # Kyber's links
 ls_rotation_webpage = _getenv("LS_ROTATION_WEBPAGE")
