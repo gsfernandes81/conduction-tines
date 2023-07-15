@@ -26,6 +26,7 @@ import miru
 import yarl
 from lightbulb.ext import tasks
 from miru.ext import nav
+from ..nav import NavigatorView
 
 from .. import utils
 from ..bot import CachedFetchBot
@@ -606,7 +607,7 @@ class IndicatorButton(nav.IndicatorButton):
         self.label = f"{date.strftime('%B %-d')}{suffix}"
 
 
-class NavigatorView(nav.NavigatorView):
+class NavigatorView(NavigatorView):
     def __init__(
         self,
         *,
