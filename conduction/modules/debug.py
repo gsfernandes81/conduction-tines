@@ -69,6 +69,34 @@ async def legacy_follow(ctx: lb.Context, source: h.GuildChannel, prefix: str):
 
 
 @debug_group.child
+@lb.option(
+    "prefix",
+    "Name prefix to create channels with",
+    h.GuildCategory,
+    default="test90931-",
+)
+@lb.option("source", "Source channel", h.GuildChannel)
+@lb.command(
+    "legacy_unfollow",
+    description="Legacy follow 300 channels",
+    pass_options=True,
+    auto_defer=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def legacy_unfollow(ctx: lb.Context, source: h.GuildChannel, prefix: str):
+    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
+        return
+
+    bot: CachedFetchBot = ctx.app
+    guild = ctx.get_guild() or await ctx.app.rest.fetch_guild(ctx.guild_id)
+
+    for channel in await get_channels(bot, guild, prefix):
+        await MirroredChannel.remove_mirror(source.id, channel.id, legacy=True)
+
+    await ctx.respond("Done")
+
+
+@debug_group.child
 @lb.option("number", "Number of channels to create", int)
 @lb.option(
     "prefix",
