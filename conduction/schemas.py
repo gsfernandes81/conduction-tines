@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 from collections import defaultdict
-from typing import List, Optional, Self
+from typing import List, Optional, Self, Tuple
 
 import regex as re
 from pytz import utc
@@ -390,6 +390,59 @@ class MirroredChannel(Base):
                 pass
 
         return mirrors_to_disable
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def get_legacy_mirrors_disabled_for_failure(
+        cls, since: Optional[dt.datetime], session: Optional[AsyncSession] = None
+    ) -> List[Tuple[int, int]]:
+        """Return mirrors that have been disabled for failure
+
+        Mirrors that have been disabled for failure since `since` are returned
+        """
+        disabled_mirrors = await session.execute(
+            select(cls.src_id, cls.dest_id).where(
+                and_(
+                    cls.enabled == False,
+                    cls.legacy == True,
+                    cls.legacy_disable_for_failure_on_date >= since,
+                )
+            )
+        )
+        disabled_mirrors = disabled_mirrors if disabled_mirrors else []
+        disabled_mirrors = disabled_mirrors.fetchall()
+
+        return disabled_mirrors
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def undo_auto_disable_for_failure(
+        cls,
+        since: Optional[dt.datetime],
+        session: Optional[AsyncSession] = None,
+    ) -> List[Tuple[int, int]]:
+        """Undo auto disable for failure of mirrors
+
+        Mirrors that have been disabled for failure since `since` are re-enabled
+        """
+        mirrors_to_enable = await cls.get_legacy_mirrors_disabled_for_failure(
+            since=since, session=session
+        )
+        await session.execute(
+            update(cls)
+            .where(
+                and_(
+                    cls.src_id.in_([mirror[0] for mirror in mirrors_to_enable]),
+                    cls.dest_id.in_([mirror[1] for mirror in mirrors_to_enable]),
+                )
+            )
+            .values(
+                enabled=True,
+                legacy_error_rate=0,
+            )
+        )
+
+        return mirrors_to_enable
 
 
 class MirroredMessage(Base):

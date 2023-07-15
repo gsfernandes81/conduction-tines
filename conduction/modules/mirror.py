@@ -18,9 +18,11 @@ from asyncio import Semaphore, TimeoutError, gather, sleep
 from types import TracebackType
 from typing import Any, Coroutine, Type
 
+import dateparser
 import hikari as h
+import lightbulb as lb
 
-from .. import utils, cfg
+from .. import cfg, utils
 from ..schemas import MirroredChannel, MirroredMessage, db_session
 
 
@@ -218,9 +220,45 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
     )
 
 
+# Command group for all mirror commands
+mirror_group = lb.command(
+    "mirror",
+    description="Command group for all mirror control/administration commands",
+    guilds=[cfg.control_discord_server_id],
+)(
+    lb.implements(
+        lb.SlashCommandGroup,
+    )(lambda: None)
+)
+
+
+@mirror_group.child
+@lb.option("from_date", description="Date to start from", type=str)
+@lb.command(
+    "undo_auto_disable",
+    description="Undo auto disable of a channel due to repeated post failures",
+    guilds=[cfg.control_discord_server_id],
+    pass_options=True,
+    auto_defer=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def undo_auto_disable(ctx: lb.Context, from_date: str):
+    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
+        return
+
+    from_date = dateparser.parse(from_date)
+
+    mirrors = await MirroredChannel.undo_auto_disable_for_failure(since=from_date)
+    response = f"Undid auto disable since {from_date} for channels {mirrors}"
+    logging.info(response)
+    await ctx.respond(response)
+
+
 def register(bot):
     for event_handler in [
         message_create_repeater,
         message_update_repeater,
     ]:
         bot.listen()(event_handler)
+
+    bot.command(mirror_group)

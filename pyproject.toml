@@ -24,6 +24,7 @@ yarl = "^1.8.2"
 hikari-toolbox = "^0.1.5"
 hikari-miru = {git = "https://github.com/gs729/hikari-miru.git"}
 asyncpg = "^0.27.0"
+dateparser = "^1.1.8"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"
