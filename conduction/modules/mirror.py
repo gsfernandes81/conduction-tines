@@ -15,6 +15,7 @@
 
 import logging
 from asyncio import Semaphore, TimeoutError, gather, sleep
+from random import randint
 from types import TracebackType
 from typing import Any, Coroutine, Type
 
@@ -120,6 +121,10 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                             f"Retrying message send in {mirror_ch_id} due to error:"
                         )
                         await utils.discord_error_logger(bot, e)
+                        # Wait for between 3 and 5 minutes before retrying
+                        # to allow for momentary discord outages of particular
+                        # servers
+                        await sleep(randint(180, 300))
                         continue
                     else:
                         break
@@ -207,6 +212,10 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                     )
             except Exception as e:
                 await utils.discord_error_logger(bot, e)
+                # Wait for between 3 and 5 minutes before retrying
+                # to allow for momentary discord outages of particular
+                # servers
+                await sleep(randint(180, 300))
             else:
                 break
         else:
