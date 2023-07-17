@@ -149,7 +149,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
 
                 # Log success to prevent auto disable
                 await MirroredChannel.log_legacy_mirror_success(
-                    msg.channel_id, mirror_ch_id, session
+                    msg.channel_id, mirror_ch_id, session=session
                 )
 
             await gather(
