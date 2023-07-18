@@ -30,7 +30,7 @@ from sqlalchemy.orm import (
     sessionmaker,
     validates,
 )
-from sqlalchemy.sql.expression import and_, delete, select, update
+from sqlalchemy.sql.expression import and_, delete, select, update, insert
 from sqlalchemy.sql.functions import func
 from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
 from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Integer, String, Text
@@ -49,6 +49,7 @@ db_session.configure(
         Base: create_async_engine(
             cfg.db_url_async,
             connect_args=cfg.db_connect_args,
+            max_overflow=-1,
         ),
         OldBase: create_async_engine(
             cfg.legacy_db_url_async,
@@ -306,6 +307,30 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
+    async def log_legacy_mirror_success_in_batch(
+        cls, src_id: int, dest_ids: List[int], session: Optional[AsyncSession] = None
+    ):
+        """Log the successful use of a batch of mirror pairs
+
+        In case of a successful mirror, the error rate is set to 0
+        """
+        src_id = int(src_id)
+        dest_ids = [int(dest_id) for dest_id in dest_ids]
+        await session.execute(
+            update(cls)
+            .where(
+                and_(
+                    cls.src_id == src_id,
+                    cls.dest_id.in_(dest_ids),
+                    cls.enabled == True,
+                    cls.legacy == True,
+                )
+            )
+            .values(legacy_error_rate=0)
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
     async def log_legacy_mirror_failure(
         cls, src_id: int, dest_id: int, session: Optional[AsyncSession] = None
     ) -> None:
@@ -321,6 +346,30 @@ class MirroredChannel(Base):
                 and_(
                     cls.src_id == src_id,
                     cls.dest_id == dest_id,
+                    cls.enabled == True,
+                    cls.legacy == True,
+                )
+            )
+            .values(legacy_error_rate=cls.legacy_error_rate + 1)
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def log_legacy_mirror_failure_in_batch(
+        cls, src_id: int, dest_ids: List[int], session: Optional[AsyncSession] = None
+    ):
+        """Log the failure of a batch of mirror pairs
+
+        In case of a failure, the error rate is increased by 1
+        """
+        src_id = int(src_id)
+        dest_ids = [int(dest_id) for dest_id in dest_ids]
+        await session.execute(
+            update(cls)
+            .where(
+                and_(
+                    cls.src_id == src_id,
+                    cls.dest_id.in_(dest_ids),
                     cls.enabled == True,
                     cls.legacy == True,
                 )
@@ -478,15 +527,51 @@ class MirroredMessage(Base):
         source_msg: int,
         source_channel: int,
         session: Optional[AsyncSession] = None,
-    ):
+    ) -> None:
         """Create a session, begin it and add a message pair"""
         dest_msg = int(dest_msg)
         dest_channel = int(dest_channel)
         source_msg = int(source_msg)
         source_channel = int(source_channel)
-        message_pair = cls(dest_msg, dest_channel, source_msg, source_channel)
-        session.add(message_pair)
-        return message_pair
+
+        await session.execute(
+            insert(cls).values(
+                dest_msg=dest_msg,
+                dest_channel=dest_channel,
+                source_msg=source_msg,
+                source_channel=source_channel,
+            )
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_msgs_in_batch(
+        cls,
+        dest_msgs: List[int],
+        dest_channels: List[int],
+        source_msg: int,
+        source_channel: int,
+        session: Optional[AsyncSession] = None,
+    ):
+        """Create a session, begin it and add a message pair"""
+        dest_msgs = [int(dest_msg) for dest_msg in dest_msgs]
+        dest_channels = [int(dest_channel) for dest_channel in dest_channels]
+        source_msg = int(source_msg)
+        source_channel = int(source_channel)
+
+        await session.execute(
+            insert(cls).values(
+                [
+                    {
+                        "dest_msg": dest_msg,
+                        "dest_channel": dest_channel,
+                        "source_msg": source_msg,
+                        "source_channel": source_channel,
+                    }
+                    for dest_msg, dest_channel in zip(dest_msgs, dest_channels)
+                ]
+            )
+        )
 
     @classmethod
     @utils.ensure_session(db_session)
