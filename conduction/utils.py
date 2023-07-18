@@ -18,6 +18,7 @@ import inspect
 import logging
 import traceback as tb
 import typing as t
+from asyncio import Semaphore
 from random import randint
 
 import aiohttp
@@ -93,6 +94,9 @@ def check_number_of_layers(
         raise ValueError(f"Too few ln_names provided, need at least {min_layers}")
 
 
+error_logger_semaphore = Semaphore(1)
+
+
 async def discord_error_logger(
     bot: h.GatewayBot, e: Exception, error_reference: int = None
 ):
@@ -101,11 +105,32 @@ async def discord_error_logger(
     if not error_reference:
         error_reference = randint(1000000, 9999999)
 
-    await (await bot.fetch_channel(cfg.log_channel)).send(
+    error_message = (
         f"Exception with error reference `{error_reference}`:\n```"
         + "\n".join(tb.format_exception(e))
         + "\n```"
     )
+
+    log_channel = await bot.fetch_channel(cfg.log_channel)
+    error_message_chunk = ""
+
+    async with error_logger_semaphore:
+        for error_msg_line in [
+            f"Exception with error reference `{error_reference}`:\n"
+        ] + error_message.split("\n"):
+            # Split the error message into lines and
+            if len(error_message_chunk) + len(error_msg_line) <= 1900:
+                # Build up lines of the error message until they
+                # are just under 1900 characters per chunk
+                error_message_chunk += error_msg_line + "\n"
+            else:
+                # And send each chunk
+                await log_channel.send("```\n" + error_message_chunk + "\n```")
+                error_message_chunk = ""
+
+        else:
+            # Send the final chunk
+            await log_channel.send(error_message_chunk)
     logging.error(f"Error reference: {error_reference}")
 
 
