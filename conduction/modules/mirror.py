@@ -86,7 +86,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     + "continuing..."
                 )
         except TimeoutError:
-            break
+            return
         except Exception as e:
             await utils.discord_error_logger(bot, e)
             await sleep(backoff_timer)
