@@ -15,7 +15,6 @@
 
 import asyncio as aio
 import logging
-import sys
 from random import randint
 from time import perf_counter
 from types import TracebackType
@@ -25,9 +24,10 @@ import attr
 import dateparser
 import hikari as h
 import lightbulb as lb
+from lightbulb.ext import tasks
 
 from .. import bot, cfg, utils
-from ..schemas import MirroredChannel, MirroredMessage, db_session
+from ..schemas import MirroredChannel, MirroredMessage, ServerStatistics, db_session
 
 
 class TimedSemaphore(aio.Semaphore):
@@ -538,6 +538,65 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
         )
 
         if len(announce_jobs) == 0:
+            break
+
+
+@tasks.task(d=7, auto_start=True, wait_before_execution=False, pass_app=True)
+async def refresh_server_sizes(bot: bot.CachedFetchBot):
+    await utils.wait_till_lightbulb_started(bot)
+    await aio.sleep(randint(30, 60))
+
+    backoff_timer = 30
+    while True:
+        try:
+            server_populations = {}
+            async for guild in bot.rest.fetch_my_guilds():
+                if not isinstance(guild, h.RESTGuild):
+                    guild = await bot.rest.fetch_guild(guild.id)
+
+                try:
+                    server_populations[guild.id] = guild.approximate_member_count
+                except Exception as e:
+                    logging.exception(e)
+
+            existing_servers = await ServerStatistics.fetch_server_ids()
+            existing_servers = list(
+                set(existing_servers).intersection(set(server_populations.keys()))
+            )
+            new_servers = list(set(server_populations.keys()) - set(existing_servers))
+
+            await ServerStatistics.add_servers_in_batch(
+                new_servers,
+                [server_populations[server_id] for server_id in new_servers],
+            )
+
+            await ServerStatistics.update_population_in_batch(
+                existing_servers,
+                [server_populations[server_id] for server_id in existing_servers],
+            )
+
+            MirroredChannel.reset_dests_cache()
+        except Exception as e:
+            should_retry_ = backoff_timer <= 24 * 60 * 60
+
+            exception_note = "Error refreshing server sizes, "
+            exception_note += (
+                f"backing off for {backoff_timer} minutes"
+                if should_retry_
+                else "giving up"
+            )
+            e.add_note(exception_note)
+
+            logging.exception(e)
+            await utils.discord_error_logger(bot, e)
+
+            if not should_retry_:
+                break
+
+            await aio.sleep(backoff_timer * 60)
+            backoff_timer = backoff_timer * 4
+
+        else:
             break
 
 

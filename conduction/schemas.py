@@ -166,12 +166,18 @@ class MirroredChannel(Base):
         cls, src_id: int, session: Optional[AsyncSession] = None
     ) -> List[int]:
         src_id = int(src_id)
-        if cls._dests_cache[src_id]:
+        if src_id in cls._dests_cache:
+            # This condition is phrased specifically to allow
+            # empty lists to be returned from the cache
             return cls._dests_cache[src_id]
         else:
             dests = await cls.fetch_dests(src_id, session=session)
             cls._dests_cache[src_id] = dests
             return dests
+
+    @classmethod
+    def reset_dests_cache(self):
+        self._dests_cache = defaultdict(list)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -632,7 +638,7 @@ class ServerStatistics(Base):
     __tablename__ = "server_statistics"
     __mapper_args__ = {"eager_defaults": True}
     # Server id
-    id = Column("id", Integer, primary_key=True)
+    id = Column("id", BigInteger, primary_key=True)
     population = Column("population", BigInteger)
 
     # Population is set high by default since its better to prioritize
@@ -654,7 +660,7 @@ class ServerStatistics(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def add_server_in_batch(
+    async def add_servers_in_batch(
         cls,
         ids: List[int],
         populations: List[int],
@@ -662,6 +668,12 @@ class ServerStatistics(Base):
     ):
         ids = [int(id) for id in ids]
         populations = [int(population) for population in populations]
+        if len(ids) != len(populations):
+            raise ValueError("ids and populations must be of the same length")
+
+        if not (ids and populations):
+            return
+
         await session.execute(
             insert(cls),
             [
@@ -669,6 +681,17 @@ class ServerStatistics(Base):
                 for id, population in zip(ids, populations)
             ],
         )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_server_ids(
+        cls,
+        session: Optional[AsyncSession] = None,
+    ) -> List[int]:
+        ids = await session.execute(select(cls.id))
+        ids = ids if ids else []
+        ids = [id[0] for id in ids]
+        return ids
 
     @classmethod
     @utils.ensure_session(db_session)
