@@ -30,8 +30,8 @@ from sqlalchemy.orm import (
     sessionmaker,
     validates,
 )
-from sqlalchemy.sql.expression import and_, delete, select, update, insert
-from sqlalchemy.sql.functions import func
+from sqlalchemy.sql.expression import and_, delete, desc, insert, select, update
+from sqlalchemy.sql.functions import coalesce, func
 from sqlalchemy.sql.schema import CheckConstraint, Column, UniqueConstraint
 from sqlalchemy.sql.sqltypes import BigInteger, Boolean, DateTime, Integer, String, Text
 
@@ -78,6 +78,7 @@ class MirroredChannel(Base):
     __table_args__ = (UniqueConstraint("src_id", "dest_id", name="_mir_ids_uc"),)
     src_id = Column("src_id", BigInteger, primary_key=True)
     dest_id = Column("dest_id", BigInteger, primary_key=True)
+    dest_server_id = Column("dest_server_id", BigInteger)
     legacy = Column("legacy", Boolean)
     enabled = Column("enabled", Boolean, default=True)
     legacy_error_rate = Column("legacy_error_rate", Integer, default=0)
@@ -86,10 +87,18 @@ class MirroredChannel(Base):
     )
     _dests_cache = defaultdict(list)
 
-    def __init__(self, src_id: int, dest_id: int, legacy: bool, enabled: bool):
+    def __init__(
+        self,
+        src_id: int,
+        dest_id: int,
+        dest_server_id: int,
+        legacy: bool,
+        enabled: bool,
+    ):
         super().__init__()
         self.src_id = int(src_id)
         self.dest_id = int(dest_id)
+        self.dest_server_id = int(dest_server_id)
         self.legacy = bool(legacy)
         self.enabled = bool(enabled)
 
@@ -99,13 +108,16 @@ class MirroredChannel(Base):
         cls,
         src_id: int,
         dest_id: int,
+        dest_server_id: int,
         legacy: bool,
         enabled: bool = True,
         session: Optional[AsyncSession] = None,
     ):
         src_id = int(src_id)
         dest_id = int(dest_id)
-        await session.merge(cls(src_id, dest_id, legacy, enabled=enabled))
+        await session.merge(
+            cls(src_id, dest_id, dest_server_id, legacy, enabled=enabled)
+        )
         if legacy and enabled and dest_id not in cls._dests_cache[src_id]:
             cls._dests_cache[src_id].append(dest_id)
 
@@ -117,7 +129,7 @@ class MirroredChannel(Base):
         legacy: bool | None = True,
         enabled: bool | None = True,
         session: Optional[AsyncSession] = None,
-    ) -> List[MirroredChannel]:
+    ) -> List[int]:
         """Fetch all dests for a given src_id
 
         src_id -> The source channel ID
@@ -125,17 +137,25 @@ class MirroredChannel(Base):
         enabled -> True: Fetch enabled only, False: Fetch disabled only, None: Fetch all
         """
         src_id = int(src_id)
-        dests = (
-            await session.execute(
-                select(cls).where(
-                    and_(
-                        cls.src_id == src_id,
-                        (cls.legacy == legacy) if legacy is not None else True,
-                        (cls.enabled == enabled) if enabled is not None else True,
-                    )
+        dests = await session.execute(
+            select(cls)
+            .where(
+                and_(
+                    cls.src_id == src_id,
+                    (cls.legacy == legacy) if legacy is not None else True,
+                    (cls.enabled == enabled) if enabled is not None else True,
                 )
             )
-        ).fetchall()
+            .join(
+                ServerStatistics,
+                cls.dest_server_id == ServerStatistics.id,
+                isouter=True,
+            )
+            .order_by(
+                desc(coalesce(ServerStatistics.population, 10**12)),
+            )
+        )
+
         dests = dests if dests else []
         dests = [dest[0].dest_id for dest in dests]
         return dests
@@ -605,6 +625,80 @@ class MirroredMessage(Base):
         """Delete entries older than <age>"""
         await session.execute(
             delete(cls).where(dt.datetime.now(tz=utc) - age > cls.creation_datetime)
+        )
+
+
+class ServerStatistics(Base):
+    __tablename__ = "server_statistics"
+    __mapper_args__ = {"eager_defaults": True}
+    # Server id
+    id = Column("id", Integer, primary_key=True)
+    population = Column("population", BigInteger)
+
+    # Population is set high by default since its better to prioritize
+    # new servers if we don't yet know their population
+    def __init__(self, id: int, population: int = 10**12):
+        self.id = int(id)
+        self.population = int(population)
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_server(
+        cls,
+        id: int,
+        population: int = 10**12,
+        session: Optional[AsyncSession] = None,
+    ):
+        id = int(id)
+        await session.merge(cls(id, population))
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def add_server_in_batch(
+        cls,
+        ids: List[int],
+        populations: List[int],
+        session: Optional[AsyncSession] = None,
+    ):
+        ids = [int(id) for id in ids]
+        populations = [int(population) for population in populations]
+        await session.execute(
+            insert(cls),
+            [
+                {"id": id, "population": population}
+                for id, population in zip(ids, populations)
+            ],
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def update_population(
+        cls,
+        id: int,
+        population: int,
+        session: Optional[AsyncSession] = None,
+    ):
+        id = int(id)
+        await session.execute(
+            update(cls).where(cls.id == id).values(population=population)
+        )
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def update_population_in_batch(
+        cls,
+        ids: List[int],
+        populations: List[int],
+        session: Optional[AsyncSession] = None,
+    ):
+        ids = [int(id) for id in ids]
+        populations = [int(population) for population in populations]
+        await session.execute(
+            update(cls),
+            [
+                {"id": id, "population": population}
+                for id, population in zip(ids, populations)
+            ],
         )
 
 

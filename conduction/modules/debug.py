@@ -63,7 +63,7 @@ async def legacy_follow(ctx: lb.Context, source: h.GuildChannel, prefix: str):
     guild = ctx.get_guild() or await ctx.app.rest.fetch_guild(ctx.guild_id)
 
     for channel in await get_channels(bot, guild, prefix):
-        await MirroredChannel.add_mirror(source.id, channel.id, legacy=True)
+        await MirroredChannel.add_mirror(source.id, channel.id, guild.id, legacy=True)
 
     await ctx.respond("Done")
 

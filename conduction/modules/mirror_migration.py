@@ -66,6 +66,7 @@ async def migrate_mirror(ctx: lb.Context, dry_run: bool = True):
                     await schemas.MirroredChannel.add_mirror(
                         source_channel,
                         channel.id,
+                        None,
                         legacy=True,
                         session=session,
                     )

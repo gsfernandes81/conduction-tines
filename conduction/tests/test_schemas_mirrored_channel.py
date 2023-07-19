@@ -18,7 +18,7 @@ import asyncio
 import pytest
 from .. import schemas
 
-from ..schemas import MirroredChannel as _MirroredChannel
+from ..schemas import MirroredChannel as _MirroredChannel, ServerStatistics
 
 
 def setup_function():
@@ -37,8 +37,9 @@ async def test_add_and_fetch_mirror(MirroredChannel):
     src_id = 0
     dest_id = 1
     dest_id_2 = 2
+    guild_id = 3
 
-    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
 
     async with schemas.db_session() as session:
         async with session.begin():
@@ -65,7 +66,7 @@ async def test_add_and_fetch_mirror(MirroredChannel):
             )
 
             await MirroredChannel.add_mirror(
-                src_id, dest_id_2, legacy=False, session=session
+                src_id, dest_id_2, guild_id, legacy=False, session=session
             )
 
             assert [src_id] == await MirroredChannel.fetch_srcs(
@@ -94,9 +95,10 @@ async def test_remove_mirror(MirroredChannel):
     src_id = 0
     dest_id = 1
     dest_id_2 = 2
+    guild_id = 3
 
-    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
-    await MirroredChannel.add_mirror(src_id, dest_id_2, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id_2, guild_id, legacy=True)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id_2)
     assert [dest_id, dest_id_2] == await MirroredChannel.fetch_dests(src_id)
@@ -112,9 +114,10 @@ async def test_remove_all_mirrors(MirroredChannel):
     src_id = 0
     src_id_2 = 1
     dest_id = 2
+    guild_id = 3
 
-    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
-    await MirroredChannel.add_mirror(src_id_2, dest_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id_2, dest_id, guild_id, legacy=True)
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id_2)
     assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
@@ -131,14 +134,15 @@ async def test_add_duplicate_mirror(MirroredChannel):
     # add_mirror uses merge instead of add
     src_id = 0
     dest_id = 1
+    guild_id = 2
 
-    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
     assert [dest_id] == await MirroredChannel.get_or_fetch_dests(src_id)
     assert [src_id] == await MirroredChannel.fetch_srcs(dest_id)
 
     # Errors here indicate that there was an issue merging
-    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
 
     # Duplicates here should not show up
     assert [dest_id] == await MirroredChannel.fetch_dests(src_id)
@@ -152,16 +156,83 @@ async def test_count_dests(MirroredChannel):
     src_id_2 = 1
     dest_id = 2
     dest_id_2 = 3
+    guild_id = 4
 
     assert 0 == await MirroredChannel.count_dests(src_id)
     assert 0 == await MirroredChannel.count_dests(src_id_2)
-    await MirroredChannel.add_mirror(src_id, dest_id, legacy=True)
-    await MirroredChannel.add_mirror(src_id_2, dest_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
+    await MirroredChannel.add_mirror(src_id_2, dest_id, guild_id, legacy=True)
     assert 1 == await MirroredChannel.count_dests(src_id)
     assert 1 == await MirroredChannel.count_dests(src_id_2)
     assert 0 == await MirroredChannel.count_dests(dest_id)
-    await MirroredChannel.add_mirror(src_id, dest_id_2, legacy=True)
+    await MirroredChannel.add_mirror(src_id, dest_id_2, guild_id, legacy=True)
     assert 2 == await MirroredChannel.count_dests(src_id)
     assert 1 == await MirroredChannel.count_dests(src_id_2)
     assert 0 == await MirroredChannel.count_dests(dest_id)
     assert 0 == await MirroredChannel.count_dests(dest_id_2)
+
+
+@pytest.mark.asyncio
+async def test_order_fetch_by_server_size(MirroredChannel: _MirroredChannel):
+    src_id = 0
+
+    dest_id_1 = 1
+    guild_id_1 = 1
+    low_pop = 1 * 10**6
+
+    dest_id_2 = 2
+    guild_id_2 = 2
+    medium_pop = 2 * 10**6
+
+    dest_id_3 = 3
+    guild_id_3 = 3
+    high_pop = 3 * 10**6
+
+    async def add_mirror(src_id, dest_id, guild_id, pop=None):
+        await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
+        if pop:
+            await ServerStatistics.add_server(guild_id, pop)
+        else:
+            await ServerStatistics.add_server(guild_id)
+
+    await add_mirror(src_id, dest_id_1, guild_id_1, low_pop)
+    await add_mirror(src_id, dest_id_2, guild_id_2, medium_pop)
+    # Ensure the default value for guild_id_3 is the largest
+    await add_mirror(src_id, dest_id_3, guild_id_3)
+
+    dests_in_order = await MirroredChannel.fetch_dests(src_id)
+    assert dests_in_order == [
+        dest_id_3,
+        dest_id_2,
+        dest_id_1,
+    ]
+
+    # Stop using the default value for guild_id_3
+    await ServerStatistics.update_population(guild_id_3, high_pop)
+
+    await ServerStatistics.update_population(guild_id_1, high_pop + 1)
+    dests_in_order = await MirroredChannel.fetch_dests(src_id)
+    assert dests_in_order == [
+        dest_id_1,
+        dest_id_3,
+        dest_id_2,
+    ]
+
+    await ServerStatistics.update_population_in_batch(
+        [
+            guild_id_3,
+            guild_id_2,
+            guild_id_1,
+        ],
+        [
+            low_pop,
+            medium_pop,
+            high_pop,
+        ],
+    )
+    dests_in_order = await MirroredChannel.fetch_dests(src_id)
+    assert dests_in_order == [
+        dest_id_1,
+        dest_id_2,
+        dest_id_3,
+    ]

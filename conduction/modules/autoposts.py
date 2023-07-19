@@ -137,7 +137,11 @@ def follow_control_command_maker(
                             followable_channel, ctx.channel_id
                         )
                         await MirroredChannel.add_mirror(
-                            followable_channel, ctx.channel_id, False, session=session
+                            followable_channel,
+                            ctx.channel_id,
+                            ctx.guild_id,
+                            False,
+                            session=session,
                         )
                     except h.BadRequestError as e:
                         if (
@@ -159,6 +163,7 @@ def follow_control_command_maker(
                             await MirroredChannel.add_mirror(
                                 followable_channel,
                                 ctx.channel_id,
+                                ctx.guild_id,
                                 True,
                                 session=session,
                             )
