@@ -261,7 +261,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                 aio.create_task(kernel(mirror_ch_id)) for mirror_ch_id in mirrors
             ]
             return_in = 10  # seconds
-            max_retries = 3
+            max_retries = 2
             log_message: h.Message = await log_mirror_progress_to_discord(
                 bot,
                 0,
@@ -297,7 +297,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     result = task.result()
                     # If the result is an exception
                     if result.exception:
-                        if result.retries + 1 < max_retries:
+                        if result.retries < max_retries:
                             # and if we have retries left
                             # then we add it to the to_retry list
                             to_retry.append(result)
@@ -329,11 +329,12 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                             success.dest_message_id for success in successes_to_log
                         ],
                         dest_channels=[
-                            success.dest_channel_id for success in successes
+                            success.dest_channel_id for success in successes_to_log
                         ],
                         source_msg=msg.id,
                         source_channel=msg.channel_id,
                     ),
+                    return_exceptions=True,
                 )
 
                 # Log exceptions working with the db to the console
@@ -361,7 +362,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     msg,
                     mirror_start_time,
                     existing_message=log_message,
-                    is_completed=not bool(pending),
+                    is_completed=not (bool(pending) or bool(to_retry)),
                 )
 
                 announce_jobs = pending | set(
@@ -378,7 +379,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     for job in to_retry
                 )
 
-                if len(pending) == 0:
+                if len(announce_jobs) == 0:
                     break
 
             logging.info(
@@ -466,7 +467,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
     ]
 
     return_in = 15  # seconds
-    max_retries = 3
+    max_retries = 2
     log_message: h.Message = await log_mirror_progress_to_discord(
         bot,
         0,
@@ -495,7 +496,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             result: KernelWorkDone = task.result()
             # If the result is an exception
             if result.exception:
-                if result.retries + 1 < max_retries:
+                if result.retries < max_retries:
                     # and if we have retries left
                     # then we add it to the to_retry list
                     to_retry.append(result)
@@ -518,7 +519,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             msg,
             mirror_start_time,
             existing_message=log_message,
-            is_completed=not bool(pending),
+            is_completed=not (bool(pending) or bool(to_retry)),
         )
 
         announce_jobs = pending | set(
@@ -536,7 +537,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             for job in to_retry
         )
 
-        if len(pending) == 0:
+        if len(announce_jobs) == 0:
             break
 
 
