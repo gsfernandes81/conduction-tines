@@ -138,7 +138,7 @@ class MirroredChannel(Base):
         """
         src_id = int(src_id)
         dests = await session.execute(
-            select(cls)
+            select(cls.dest_id)
             .where(
                 and_(
                     cls.src_id == src_id,
@@ -157,7 +157,7 @@ class MirroredChannel(Base):
         )
 
         dests = dests if dests else []
-        dests = [dest[0].dest_id for dest in dests]
+        dests = [dest[0] for dest in dests]
         return dests
 
     @classmethod
@@ -191,7 +191,7 @@ class MirroredChannel(Base):
         dest_id = int(dest_id)
         srcs = (
             await session.execute(
-                select(cls).where(
+                select(cls.src_id).where(
                     and_(
                         cls.dest_id == dest_id,
                         (cls.legacy == legacy) if legacy is not None else True,
@@ -201,7 +201,7 @@ class MirroredChannel(Base):
             )
         ).fetchall()
         srcs = srcs if srcs else []
-        srcs = [src[0].src_id for src in srcs]
+        srcs = [src[0] for src in srcs]
         return srcs
 
     @classmethod
