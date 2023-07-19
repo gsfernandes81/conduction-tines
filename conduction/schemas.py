@@ -501,7 +501,9 @@ class MirroredMessage(Base):
     dest_channel = Column("dest_ch", BigInteger)
     source_msg = Column("source_msg", BigInteger)
     source_channel = Column("src_ch", BigInteger)
-    creation_datetime = Column("creation_datetime", DateTime)
+    creation_datetime = Column(
+        "creation_datetime", DateTime, default=dt.datetime.utcnow
+    )
 
     def __init__(
         self,
