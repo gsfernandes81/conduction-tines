@@ -80,124 +80,140 @@ async def log_mirror_progress_to_discord(
     source_channel: Optional[h.GuildChannel] = None,
     is_completed: Optional[bool] = False,
 ):
-    log_channel: h.TextableGuildChannel = await bot.fetch_channel(cfg.log_channel)
-
-    COMPLETED = 2
-    RETRYING = 3
-    FAILED = 4
-    REMAINING = 5
-    TIME_TAKEN = 6
-    PERCENTILE_TIME = 7
-
-    if isinstance(existing_message, int):
-        existing_message = await bot.fetch_message(log_channel, existing_message)
-
-    time_taken = round(perf_counter() - start_time, 2)
-    time_taken = (
-        f"{time_taken} seconds"
-        if time_taken < 60
-        else f"{time_taken // 60} minutes {round(time_taken % 60, 2)} seconds"
-    )
-
-    progress_fraction = (successes + failures) / (
-        pending + retries + successes + failures
-    )
-
-    if not existing_message:
-        source_channel: h.TextableGuildChannel = (
-            await bot.fetch_channel(source_message.channel_id)
-            if not source_channel
-            else (
-                source_channel
-                if isinstance(source_channel, h.GuildChannel)
-                else await bot.fetch_channel(source_channel)
+    for _ in range(3):
+        try:
+            log_channel: h.TextableGuildChannel = await bot.fetch_channel(
+                cfg.log_channel
             )
-        )
-        if source_message:
-            source_guild = await bot.fetch_guild(source_channel.guild_id)
 
-            source_message_summary = (
-                source_message.content.split("\n")[0]
-                if source_message.content
-                else False
-            ) or (
-                (
-                    source_message.embeds[0].title
-                    or source_message.embeds[0].description.split()[0],
+            COMPLETED = 2
+            RETRYING = 3
+            FAILED = 4
+            REMAINING = 5
+            TIME_TAKEN = 6
+            PERCENTILE_TIME = 7
+
+            if isinstance(existing_message, int):
+                existing_message = await bot.fetch_message(
+                    log_channel, existing_message
                 )
-                if source_message.embeds
-                else "Link"
-            )
-            source_message_link = source_message.make_link(source_guild)
 
-        else:
-            source_message_summary = "Unknown"
-            source_message_link = ""
-
-        source_channel_link = (
-            "https://discord.com/channels/"
-            + str(source_channel.guild_id)
-            + "/"
-            + str(source_channel.id)
-        )
-
-        embed = h.Embed(color=cfg.embed_default_color, title=title)
-        embed.add_field(
-            "Source message",
-            f"[{source_message_summary}]({source_message_link})"
-            if source_message
-            else source_message_summary,
-        ).add_field(
-            "Source channel", f"[{source_channel.name}]({source_channel_link})"
-        ).add_field(
-            "Completed", str(successes)
-        ).add_field(
-            "Retrying", str(retries)
-        ).add_field(
-            "Failed", str(failures)
-        ).add_field(
-            "Remaining", str(pending)
-        ).add_field(
-            "Time taken", f"{time_taken}"
-        ).add_field(
-            "98% time",
-            time_taken if progress_fraction >= 0.98 else "TBC",
-        )
-
-        if source_message:
-            if source_message.embeds and source_message.embeds[0].image:
-                embed.set_thumbnail(source_message.embeds[0].image.url)
-            elif source_message.attachments and source_message.attachments[
-                0
-            ].media_type.startswith("image"):
-                embed.set_thumbnail(source_message.attachments[0].url)
-
-        if is_completed:
-            embed.set_footer(
-                text="✅ Completed",
-            )
-        else:
-            embed.set_footer(
-                text="⏳ In progress",
+            time_taken = round(perf_counter() - start_time, 2)
+            time_taken = (
+                f"{time_taken} seconds"
+                if time_taken < 60
+                else f"{time_taken // 60} minutes {round(time_taken % 60, 2)} seconds"
             )
 
-        return await log_channel.send(embed)
-    else:
-        embed = existing_message.embeds[0]
-        embed.edit_field(COMPLETED, h.UNDEFINED, str(successes))
-        embed.edit_field(RETRYING, h.UNDEFINED, str(retries))
-        embed.edit_field(FAILED, h.UNDEFINED, str(failures))
-        embed.edit_field(REMAINING, h.UNDEFINED, str(pending))
-        embed.edit_field(TIME_TAKEN, h.UNDEFINED, str(time_taken))
-        if progress_fraction >= 0.98 and embed.fields[PERCENTILE_TIME].value == "TBC":
-            embed.edit_field(PERCENTILE_TIME, h.UNDEFINED, str(time_taken))
-
-        if is_completed:
-            embed.set_footer(
-                text="✅ Completed",
+            progress_fraction = (successes + failures) / (
+                pending + retries + successes + failures
             )
 
-        return await existing_message.edit(embeds=[embed])
+            if not existing_message:
+                source_channel: h.TextableGuildChannel = (
+                    await bot.fetch_channel(source_message.channel_id)
+                    if not source_channel
+                    else (
+                        source_channel
+                        if isinstance(source_channel, h.GuildChannel)
+                        else await bot.fetch_channel(source_channel)
+                    )
+                )
+                if source_message:
+                    source_guild = await bot.fetch_guild(source_channel.guild_id)
+
+                    source_message_summary = (
+                        source_message.content.split("\n")[0]
+                        if source_message.content
+                        else False
+                    ) or (
+                        (
+                            source_message.embeds[0].title
+                            or source_message.embeds[0].description.split()[0],
+                        )
+                        if source_message.embeds
+                        else "Link"
+                    )
+                    source_message_link = source_message.make_link(source_guild)
+
+                else:
+                    source_message_summary = "Unknown"
+                    source_message_link = ""
+
+                source_channel_link = (
+                    "https://discord.com/channels/"
+                    + str(source_channel.guild_id)
+                    + "/"
+                    + str(source_channel.id)
+                )
+
+                embed = h.Embed(color=cfg.embed_default_color, title=title)
+                embed.add_field(
+                    "Source message",
+                    f"[{source_message_summary}]({source_message_link})"
+                    if source_message
+                    else source_message_summary,
+                    inline=True,
+                ).add_field(
+                    "Source channel",
+                    f"[{source_channel.name}]({source_channel_link})",
+                    inline=True,
+                ).add_field(
+                    "Completed", str(successes), inline=True
+                ).add_field(
+                    "Retrying", str(retries), inline=True
+                ).add_field(
+                    "Failed", str(failures), inline=True
+                ).add_field(
+                    "Remaining", str(pending), inline=True
+                ).add_field(
+                    "Time taken", f"{time_taken}"
+                ).add_field(
+                    "98% time",
+                    time_taken if progress_fraction >= 0.98 else "TBC",
+                )
+
+                if source_message:
+                    if source_message.embeds and source_message.embeds[0].image:
+                        embed.set_thumbnail(source_message.embeds[0].image.url)
+                    elif source_message.attachments and source_message.attachments[
+                        0
+                    ].media_type.startswith("image"):
+                        embed.set_thumbnail(source_message.attachments[0].url)
+
+                if is_completed:
+                    embed.set_footer(
+                        text="✅ Completed",
+                    )
+                else:
+                    embed.set_footer(
+                        text="⏳ In progress",
+                    )
+
+                return await log_channel.send(embed)
+            else:
+                embed = existing_message.embeds[0]
+                embed.edit_field(COMPLETED, h.UNDEFINED, str(successes))
+                embed.edit_field(RETRYING, h.UNDEFINED, str(retries))
+                embed.edit_field(FAILED, h.UNDEFINED, str(failures))
+                embed.edit_field(REMAINING, h.UNDEFINED, str(pending))
+                embed.edit_field(TIME_TAKEN, h.UNDEFINED, str(time_taken))
+                if (
+                    progress_fraction >= 0.98
+                    and embed.fields[PERCENTILE_TIME].value == "TBC"
+                ):
+                    embed.edit_field(PERCENTILE_TIME, h.UNDEFINED, str(time_taken))
+
+                if is_completed:
+                    embed.set_footer(
+                        text="✅ Completed",
+                    )
+
+                return await existing_message.edit(embeds=[embed])
+        except Exception as e:
+            e.add_note("Failed to log mirror progress due to exception\n")
+            logging.exception(e)
+            await aio.sleep(5)
 
 
 async def message_create_repeater(event: h.MessageCreateEvent):
