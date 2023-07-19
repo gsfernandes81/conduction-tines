@@ -15,10 +15,11 @@
 
 import asyncio as aio
 import logging
+import sys
 from random import randint
 from time import perf_counter
 from types import TracebackType
-from typing import Any, Coroutine, List, Optional, Type
+from typing import Any, Coroutine, Optional, Type
 
 import attr
 import dateparser
@@ -76,7 +77,7 @@ async def log_mirror_progress_to_discord(
     start_time: float,
     title: Optional[str] = "Mirror progress",
     existing_message: Optional[int | h.Message] = None,
-    completed: Optional[bool] = False,
+    is_completed: Optional[bool] = False,
 ):
     log_channel: h.TextableGuildChannel = await bot.fetch_channel(cfg.log_channel)
 
@@ -102,7 +103,9 @@ async def log_mirror_progress_to_discord(
         )
         source_guild = await bot.fetch_guild(source_channel.guild_id)
 
-        source_message_summary = source_message.content.split("\n")[0] or (
+        source_message_summary = (
+            source_message.content.split("\n")[0] if source_message.content else False
+        ) or (
             (
                 source_message.embeds[0].title
                 or source_message.embeds[0].description.split()[0],
@@ -142,7 +145,7 @@ async def log_mirror_progress_to_discord(
         ].media_type.startswith("image"):
             embed.set_thumbnail(source_message.attachments[0].url)
 
-        if completed:
+        if is_completed:
             embed.set_footer(
                 text="✅ Completed",
             )
@@ -160,7 +163,7 @@ async def log_mirror_progress_to_discord(
         embed.edit_field(REMAINING, h.UNDEFINED, str(pending))
         embed.edit_field(TIME_TAKEN, h.UNDEFINED, str(time_taken))
 
-        if completed:
+        if is_completed:
             embed.set_footer(
                 text="✅ Completed",
             )
@@ -235,10 +238,11 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                             embeds=msg.embeds,
                         )
                 except Exception as e:
-                    logging.error(
-                        f"Scheduling retry for message to {mirror_ch_id} due to error:"
+                    e.add_note(
+                        f"Scheduling retry for message-send to channel {mirror_ch_id} "
+                        + "due to exception\n"
                     )
-                    await utils.discord_error_logger(bot, e)
+                    logging.exception(e)
                     return KernelWorkDone(
                         source_message_id=msg.id,
                         dest_channel_id=mirror_ch_id,
@@ -256,7 +260,6 @@ async def message_create_repeater(event: h.MessageCreateEvent):
             announce_jobs = [
                 aio.create_task(kernel(mirror_ch_id)) for mirror_ch_id in mirrors
             ]
-            completed = []
             return_in = 10  # seconds
             max_retries = 3
             log_message: h.Message = await log_mirror_progress_to_discord(
@@ -270,8 +273,13 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                 title="Mirror progress",
             )
 
+            successes = []
+            failures = []
+            to_retry = []
+            pending = []
+
             while True:
-                sent, pending = await aio.wait(
+                done, pending = await aio.wait(
                     # announce_jobs is set then updated to only contain pending jobs
                     announce_jobs,
                     # Use the timeout to return in a fixed time to update logging and the db
@@ -279,11 +287,13 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     return_when=aio.ALL_COMPLETED,
                 )
 
-                successes = []
+                # Successes and failures to log to db
+                failures_to_log = []
+                successes_to_log = []
+                # Empty the to_retry list
                 to_retry = []
-                failures = []
 
-                for task in sent:
+                for task in done:
                     result = task.result()
                     # If the result is an exception
                     if result.exception:
@@ -295,27 +305,29 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                             # if we have no retries left
                             # then we add it to the failures list
                             # for logging in the db
-                            failures.append(result)
+                            failures_to_log.append(result)
                     else:
                         # If the result is not an exception
                         # then we add it to the successes list
                         # to be logged in the db
-                        successes.append(result)
+                        successes_to_log.append(result)
 
                 # Log successes, failures and message pairs to the db
                 maybe_exceptions = await aio.gather(
                     MirroredChannel.log_legacy_mirror_failure_in_batch(
                         msg.channel_id,
-                        [failure.dest_channel_id for failure in failures],
+                        [failure.dest_channel_id for failure in failures_to_log],
                         session=session,
                     ),
                     MirroredChannel.log_legacy_mirror_success_in_batch(
                         msg.channel_id,
-                        [success.dest_channel_id for success in successes],
+                        [success.dest_channel_id for success in successes_to_log],
                         session=session,
                     ),
                     MirroredMessage.add_msgs_in_batch(
-                        dest_msgs=[success.dest_message_id for success in successes],
+                        dest_msgs=[
+                            success.dest_message_id for success in successes_to_log
+                        ],
                         dest_channels=[
                             success.dest_channel_id for success in successes
                         ],
@@ -337,8 +349,21 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         )
                     )
 
-                completed.extend(successes)
-                completed.extend(failures)
+                successes.extend(successes_to_log)
+                failures.extend(failures_to_log)
+
+                log_message = await log_mirror_progress_to_discord(
+                    bot,
+                    len(successes),
+                    len(to_retry),
+                    len(failures),
+                    len(pending),
+                    msg,
+                    mirror_start_time,
+                    existing_message=log_message,
+                    is_completed=not bool(pending),
+                )
+
                 announce_jobs = pending | set(
                     aio.create_task(
                         kernel(
@@ -351,20 +376,6 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         )
                     )
                     for job in to_retry
-                )
-
-                log_message = await log_mirror_progress_to_discord(
-                    bot,
-                    len(
-                        [success for success in completed if success.exception is None]
-                    ),
-                    len(to_retry),
-                    len(failures)
-                    + len([success for success in completed if success.exception]),
-                    len(pending),
-                    msg,
-                    mirror_start_time,
-                    existing_message=log_message,
                 )
 
                 if len(pending) == 0:
@@ -407,6 +418,9 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                 return
 
             msgs_to_update = await MirroredMessage.get_dest_msgs_and_channels(msg.id)
+            if not msgs_to_update:
+                # Return if this message was not mirrored for any reason
+                return
 
         except Exception as e:
             await utils.discord_error_logger(bot, e)
@@ -418,7 +432,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
     mirror_start_time = perf_counter()
 
     async def kernel(
-        msg_id: int, channel_id: int, retries: Optional[int] = 0, delay: int = 0
+        msg_id: int, channel_id: int, current_retries: Optional[int] = 0, delay: int = 0
     ) -> None | KernelWorkDone:
         await aio.sleep(delay)
 
@@ -433,15 +447,24 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                     embeds=msg.embeds,
                 )
         except Exception as e:
-            return KernelWorkDone(msg_id, channel_id, exception=e, retries=retries)
+            e.add_note(
+                f"Scheduling retry for message-update to channel {channel_id} "
+                + "due to exception\n"
+            )
+            logging.exception(e)
+            return KernelWorkDone(
+                msg_id, channel_id, exception=e, retries=current_retries
+            )
         else:
-            return KernelWorkDone(msg_id, channel_id, dest_msg.id, retries=retries)
+            return KernelWorkDone(
+                msg_id, channel_id, dest_msg.id, retries=current_retries
+            )
 
     announce_jobs = [
         aio.create_task(kernel(msg_id, channel_id))
         for msg_id, channel_id in msgs_to_update
     ]
-    completed = []
+
     return_in = 15  # seconds
     max_retries = 3
     log_message: h.Message = await log_mirror_progress_to_discord(
@@ -455,6 +478,9 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
         title="Mirror update progress",
     )
 
+    successes = []
+    to_retry = []
+    failures = []
     while True:
         done, pending = await aio.wait(
             announce_jobs,
@@ -462,9 +488,8 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             return_when=aio.ALL_COMPLETED,
         )
 
-        successes = []
+        # Empty the to_retry list
         to_retry = []
-        failures = []
 
         for task in done:
             result: KernelWorkDone = task.result()
@@ -484,8 +509,18 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                 # then we add it to the successes list
                 successes.append(result)
 
-        completed.extend(successes)
-        completed.extend(failures)
+        log_message = await log_mirror_progress_to_discord(
+            bot,
+            len(successes),
+            len(to_retry),
+            len(failures),
+            len(pending),
+            msg,
+            mirror_start_time,
+            existing_message=log_message,
+            is_completed=not bool(pending),
+        )
+
         announce_jobs = pending | set(
             aio.create_task(
                 kernel(
@@ -499,18 +534,6 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                 )
             )
             for job in to_retry
-        )
-
-        log_message = await log_mirror_progress_to_discord(
-            bot,
-            len([success for success in completed if success.exception is None]),
-            len(to_retry),
-            len(failures)
-            + len([success for success in completed if success.exception]),
-            len(pending),
-            msg,
-            mirror_start_time,
-            existing_message=log_message,
         )
 
         if len(pending) == 0:
