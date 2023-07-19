@@ -269,6 +269,26 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         retries=current_retries,
                     )
 
+                if isinstance(channel, h.GuildNewsChannel):
+                    # If the channel is a news channel then crosspost the message as well
+                    crosspost_backoff = 30
+                    for _ in range(3):
+                        try:
+                            async with discord_api_semaphore:
+                                await bot.rest.crosspost_message(
+                                    mirror_ch_id, mirrored_msg.id
+                                )
+                        except Exception as e:
+                            e.add_note(
+                                f"Failed to crosspost message in channel {mirror_ch_id} "
+                                + "due to exception\n"
+                            )
+                            logging.exception(e)
+                            await aio.sleep(crosspost_backoff)
+                            crosspost_backoff = crosspost_backoff * 2
+                        else:
+                            break
+
                 return KernelWorkDone(
                     source_message_id=msg.id,
                     dest_channel_id=mirror_ch_id,
