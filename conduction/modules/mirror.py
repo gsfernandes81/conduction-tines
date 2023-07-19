@@ -798,6 +798,17 @@ async def refresh_server_sizes(bot: bot.CachedFetchBot):
             break
 
 
+@tasks.task(d=1, auto_start=True, wait_before_execution=False, pass_app=True)
+async def prune_message_db(bot: bot.CachedFetchBot):
+    await aio.sleep(randint(120, 1800))
+    try:
+        await MirroredMessage.prune()
+    except Exception as e:
+        e.add_note("Exception during routine pruning of MirroredMessage")
+        logging.exception(e)
+        await utils.discord_error_logger(bot, e)
+
+
 # Command group for all mirror commands
 mirror_group = lb.command(
     "mirror",
