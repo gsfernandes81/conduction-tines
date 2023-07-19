@@ -87,6 +87,7 @@ async def log_mirror_progress_to_discord(
     FAILED = 4
     REMAINING = 5
     TIME_TAKEN = 6
+    PERCENTILE_TIME = 7
 
     if isinstance(existing_message, int):
         existing_message = await bot.fetch_message(log_channel, existing_message)
@@ -96,6 +97,10 @@ async def log_mirror_progress_to_discord(
         f"{time_taken} seconds"
         if time_taken < 60
         else f"{time_taken // 60} minutes {round(time_taken % 60, 2)} seconds"
+    )
+
+    progress_fraction = (successes + failures) / (
+        pending + retries + successes + failures
     )
 
     if not existing_message:
@@ -154,6 +159,9 @@ async def log_mirror_progress_to_discord(
             "Remaining", str(pending)
         ).add_field(
             "Time taken", f"{time_taken}"
+        ).add_field(
+            "98% time",
+            time_taken if progress_fraction >= 0.98 else "TBC",
         )
 
         if source_message:
@@ -181,6 +189,8 @@ async def log_mirror_progress_to_discord(
         embed.edit_field(FAILED, h.UNDEFINED, str(failures))
         embed.edit_field(REMAINING, h.UNDEFINED, str(pending))
         embed.edit_field(TIME_TAKEN, h.UNDEFINED, str(time_taken))
+        if progress_fraction >= 0.98 and embed.fields[PERCENTILE_TIME].value == "TBC":
+            embed.edit_field(PERCENTILE_TIME, h.UNDEFINED, str(time_taken))
 
         if is_completed:
             embed.set_footer(
