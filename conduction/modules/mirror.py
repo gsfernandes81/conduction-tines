@@ -73,10 +73,11 @@ async def log_mirror_progress_to_discord(
     retries: int,
     failures: int,
     pending: int,
-    source_message: h.Message,
+    source_message: h.Message | None,
     start_time: float,
     title: Optional[str] = "Mirror progress",
     existing_message: Optional[int | h.Message] = None,
+    source_channel: Optional[h.GuildChannel] = None,
     is_completed: Optional[bool] = False,
 ):
     log_channel: h.TextableGuildChannel = await bot.fetch_channel(cfg.log_channel)
@@ -98,22 +99,36 @@ async def log_mirror_progress_to_discord(
     )
 
     if not existing_message:
-        source_channel: h.TextableGuildChannel = await bot.fetch_channel(
-            source_message.channel_id
-        )
-        source_guild = await bot.fetch_guild(source_channel.guild_id)
-
-        source_message_summary = (
-            source_message.content.split("\n")[0] if source_message.content else False
-        ) or (
-            (
-                source_message.embeds[0].title
-                or source_message.embeds[0].description.split()[0],
+        source_channel: h.TextableGuildChannel = (
+            await bot.fetch_channel(source_message.channel_id)
+            if not source_channel
+            else (
+                source_channel
+                if isinstance(source_channel, h.GuildChannel)
+                else await bot.fetch_channel(source_channel)
             )
-            if source_message.embeds
-            else "Link"
         )
-        source_message_link = source_message.make_link(source_guild)
+        if source_message:
+            source_guild = await bot.fetch_guild(source_channel.guild_id)
+
+            source_message_summary = (
+                source_message.content.split("\n")[0]
+                if source_message.content
+                else False
+            ) or (
+                (
+                    source_message.embeds[0].title
+                    or source_message.embeds[0].description.split()[0],
+                )
+                if source_message.embeds
+                else "Link"
+            )
+            source_message_link = source_message.make_link(source_guild)
+
+        else:
+            source_message_summary = "Unknown"
+            source_message_link = ""
+
         source_channel_link = (
             "https://discord.com/channels/"
             + str(source_channel.guild_id)
@@ -123,7 +138,10 @@ async def log_mirror_progress_to_discord(
 
         embed = h.Embed(color=cfg.embed_default_color, title=title)
         embed.add_field(
-            "Source message", f"[{source_message_summary}]({source_message_link})"
+            "Source message",
+            f"[{source_message_summary}]({source_message_link})"
+            if source_message
+            else source_message_summary,
         ).add_field(
             "Source channel", f"[{source_channel.name}]({source_channel_link})"
         ).add_field(
@@ -135,15 +153,16 @@ async def log_mirror_progress_to_discord(
         ).add_field(
             "Remaining", str(pending)
         ).add_field(
-            "Time taken", f"{time_taken} seconds"
+            "Time taken", f"{time_taken}"
         )
 
-        if source_message.embeds and source_message.embeds[0].image:
-            embed.set_thumbnail(source_message.embeds[0].image.url)
-        elif source_message.attachments and source_message.attachments[
-            0
-        ].media_type.startswith("image"):
-            embed.set_thumbnail(source_message.attachments[0].url)
+        if source_message:
+            if source_message.embeds and source_message.embeds[0].image:
+                embed.set_thumbnail(source_message.embeds[0].image.url)
+            elif source_message.attachments and source_message.attachments[
+                0
+            ].media_type.startswith("image"):
+                embed.set_thumbnail(source_message.attachments[0].url)
 
         if is_completed:
             embed.set_footer(
@@ -541,6 +560,139 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             break
 
 
+async def message_delete_repeater(event: h.MessageDeleteEvent):
+    msg_id = event.message_id
+    msg = event.old_message
+    bot = event.app
+
+    backoff_timer = 30
+    while True:
+        try:
+            if not await MirroredChannel.get_or_fetch_dests(event.channel_id):
+                # Return if this channel is not to be mirrored
+                # ie if no mirror list found for it
+                return
+
+            msgs_to_delete = await MirroredMessage.get_dest_msgs_and_channels(msg_id)
+            if not msgs_to_delete:
+                # Return if this message was not mirrored for any reason
+                return
+
+        except Exception as e:
+            await utils.discord_error_logger(bot, e)
+            await aio.sleep(backoff_timer)
+            backoff_timer += 30 / backoff_timer
+        else:
+            break
+
+    mirror_start_time = perf_counter()
+
+    async def kernel(
+        msg_id: int, channel_id: int, current_retries: Optional[int] = 0, delay: int = 0
+    ) -> None | KernelWorkDone:
+        await aio.sleep(delay)
+
+        try:
+            async with discord_api_semaphore:
+                dest_msg: h.Message = await bot.fetch_message(channel_id, msg_id)
+            async with discord_api_semaphore:
+                await dest_msg.delete()
+
+        except Exception as e:
+            e.add_note(
+                f"Scheduling retry for message-delete to channel {channel_id} "
+                + "due to exception\n"
+            )
+            logging.exception(e)
+            return KernelWorkDone(
+                msg_id, channel_id, exception=e, retries=current_retries
+            )
+        else:
+            return KernelWorkDone(
+                msg_id, channel_id, dest_msg.id, retries=current_retries
+            )
+
+    announce_jobs = [
+        aio.create_task(kernel(msg_id, channel_id))
+        for msg_id, channel_id in msgs_to_delete
+    ]
+
+    return_in = 10  # seconds
+    max_retries = 2
+    log_message: h.Message = await log_mirror_progress_to_discord(
+        bot,
+        0,
+        0,
+        0,
+        len(msgs_to_delete),
+        msg,
+        mirror_start_time,
+        source_channel=event.channel_id,
+        title="Mirror delete progress",
+    )
+
+    successes = []
+    to_retry = []
+    failures = []
+    while True:
+        done, pending = await aio.wait(
+            announce_jobs,
+            timeout=return_in,
+            return_when=aio.ALL_COMPLETED,
+        )
+
+        # Empty the to_retry list
+        to_retry = []
+
+        for task in done:
+            result: KernelWorkDone = task.result()
+            # If the result is an exception
+            if result.exception:
+                if result.retries < max_retries:
+                    # and if we have retries left
+                    # then we add it to the to_retry list
+                    to_retry.append(result)
+                else:
+                    # if we have no retries left
+                    # then we add it to the failures list
+                    # for logging only to the console
+                    failures.append(result)
+            else:
+                # If the result is not an exception
+                # then we add it to the successes list
+                successes.append(result)
+
+        log_message = await log_mirror_progress_to_discord(
+            bot,
+            len(successes),
+            len(to_retry),
+            len(failures),
+            len(pending),
+            None,
+            mirror_start_time,
+            existing_message=log_message,
+            is_completed=not (bool(pending) or bool(to_retry)),
+        )
+
+        announce_jobs = pending | set(
+            aio.create_task(
+                kernel(
+                    job.source_message_id,
+                    job.dest_channel_id,
+                    job.retries + 1,
+                    # Wait for between 3 and 5 minutes before retrying
+                    # to allow for momentary discord outages of particular
+                    # servers
+                    delay=randint(180, 300),
+                )
+            )
+            for job in to_retry
+        )
+
+        if len(announce_jobs) == 0:
+            break
+
+
 @tasks.task(d=7, auto_start=True, wait_before_execution=False, pass_app=True)
 async def refresh_server_sizes(bot: bot.CachedFetchBot):
     await utils.wait_till_lightbulb_started(bot)
@@ -638,6 +790,7 @@ def register(bot):
     for event_handler in [
         message_create_repeater,
         message_update_repeater,
+        message_delete_repeater,
     ]:
         bot.listen()(event_handler)
 
