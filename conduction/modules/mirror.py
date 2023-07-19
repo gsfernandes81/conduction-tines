@@ -56,7 +56,7 @@ discord_api_semaphore = TimedSemaphore()
 
 
 @attr.s
-class CreationKernelWorkDone:
+class KernelWorkDone:
     """Class to hold the result of a creation kernel"""
 
     source_message_id: int = attr.ib(converter=int)
@@ -68,13 +68,15 @@ class CreationKernelWorkDone:
 
 async def log_mirror_progress_to_discord(
     bot: bot.CachedFetchBot,
-    successes: List[CreationKernelWorkDone],
-    retries: List[CreationKernelWorkDone],
-    failures: List[CreationKernelWorkDone],
-    pending: List[aio.Task],
+    successes: int,
+    retries: int,
+    failures: int,
+    pending: int,
     source_message: h.Message,
     start_time: float,
+    title: Optional[str] = "Mirror progress",
     existing_message: Optional[int | h.Message] = None,
+    completed: Optional[bool] = False,
 ):
     log_channel: h.TextableGuildChannel = await bot.fetch_channel(cfg.log_channel)
 
@@ -88,6 +90,11 @@ async def log_mirror_progress_to_discord(
         existing_message = await bot.fetch_message(log_channel, existing_message)
 
     time_taken = round(perf_counter() - start_time, 2)
+    time_taken = (
+        f"{time_taken} seconds"
+        if time_taken < 60
+        else f"{time_taken // 60} minutes {round(time_taken % 60, 2)} seconds"
+    )
 
     if not existing_message:
         source_channel: h.TextableGuildChannel = await bot.fetch_channel(
@@ -111,19 +118,19 @@ async def log_mirror_progress_to_discord(
             + str(source_channel.id)
         )
 
-        embed = h.Embed(color=cfg.embed_default_color, title="Mirror Progress")
+        embed = h.Embed(color=cfg.embed_default_color, title=title)
         embed.add_field(
             "Source message", f"[{source_message_summary}]({source_message_link})"
         ).add_field(
             "Source channel", f"[{source_channel.name}]({source_channel_link})"
         ).add_field(
-            "Completed", str(len(successes))
+            "Completed", str(successes)
         ).add_field(
-            "Retrying", str(len(retries))
+            "Retrying", str(retries)
         ).add_field(
-            "Failed", str(len(failures))
+            "Failed", str(failures)
         ).add_field(
-            "Remaining", str(len(pending))
+            "Remaining", str(pending)
         ).add_field(
             "Time taken", f"{time_taken} seconds"
         )
@@ -135,14 +142,29 @@ async def log_mirror_progress_to_discord(
         ].media_type.startswith("image"):
             embed.set_thumbnail(source_message.attachments[0].url)
 
+        if completed:
+            embed.set_footer(
+                text="✅ Completed",
+            )
+        else:
+            embed.set_footer(
+                text="⏳ In progress",
+            )
+
         return await log_channel.send(embed)
     else:
         embed = existing_message.embeds[0]
-        embed.edit_field(COMPLETED, h.UNDEFINED, str(len(successes)))
-        embed.edit_field(RETRYING, h.UNDEFINED, str(len(retries)))
-        embed.edit_field(FAILED, h.UNDEFINED, str(len(failures)))
-        embed.edit_field(REMAINING, h.UNDEFINED, str(len(pending)))
-        embed.edit_field(TIME_TAKEN, h.UNDEFINED, f"{time_taken} seconds")
+        embed.edit_field(COMPLETED, h.UNDEFINED, str(successes))
+        embed.edit_field(RETRYING, h.UNDEFINED, str(retries))
+        embed.edit_field(FAILED, h.UNDEFINED, str(failures))
+        embed.edit_field(REMAINING, h.UNDEFINED, str(pending))
+        embed.edit_field(TIME_TAKEN, h.UNDEFINED, str(time_taken))
+
+        if completed:
+            embed.set_footer(
+                text="✅ Completed",
+            )
+
         return await existing_message.edit(embeds=[embed])
 
 
@@ -193,8 +215,10 @@ async def message_create_repeater(event: h.MessageCreateEvent):
         async with session.begin():
 
             async def kernel(
-                mirror_ch_id: int, current_retries: int = 0
-            ) -> CreationKernelWorkDone:
+                mirror_ch_id: int, current_retries: int = 0, delay: int = 0
+            ) -> KernelWorkDone:
+                await aio.sleep(delay)
+
                 try:
                     channel: h.TextableChannel = await bot.fetch_channel(mirror_ch_id)
 
@@ -215,19 +239,14 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         f"Scheduling retry for message to {mirror_ch_id} due to error:"
                     )
                     await utils.discord_error_logger(bot, e)
-                    # Wait for between 3 and 5 minutes before retrying
-                    # to allow for momentary discord outages of particular
-                    # servers
-                    if not cfg.test_env:
-                        await aio.sleep(randint(180, 300))
-                    return CreationKernelWorkDone(
+                    return KernelWorkDone(
                         source_message_id=msg.id,
                         dest_channel_id=mirror_ch_id,
                         exception=e,
                         retries=current_retries,
                     )
 
-                return CreationKernelWorkDone(
+                return KernelWorkDone(
                     source_message_id=msg.id,
                     dest_channel_id=mirror_ch_id,
                     dest_message_id=mirrored_msg.id,
@@ -241,7 +260,14 @@ async def message_create_repeater(event: h.MessageCreateEvent):
             return_in = 10  # seconds
             max_retries = 3
             log_message: h.Message = await log_mirror_progress_to_discord(
-                bot, [], [], [], mirrors, msg, mirror_start_time
+                bot,
+                0,
+                0,
+                0,
+                len(mirrors),
+                msg,
+                mirror_start_time,
+                title="Mirror progress",
             )
 
             while True:
@@ -318,6 +344,10 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                         kernel(
                             job.dest_channel_id,
                             job.retries + 1,
+                            # Wait for between 3 and 5 minutes before retrying
+                            # to allow for momentary discord outages of particular
+                            # servers
+                            delay=randint(180, 300),
                         )
                     )
                     for job in to_retry
@@ -325,10 +355,13 @@ async def message_create_repeater(event: h.MessageCreateEvent):
 
                 log_message = await log_mirror_progress_to_discord(
                     bot,
-                    [success for success in completed if success.exception is None],
-                    to_retry,
-                    failures,
-                    pending,
+                    len(
+                        [success for success in completed if success.exception is None]
+                    ),
+                    len(to_retry),
+                    len(failures)
+                    + len([success for success in completed if success.exception]),
+                    len(pending),
                     msg,
                     mirror_start_time,
                     existing_message=log_message,
@@ -382,35 +415,106 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
         else:
             break
 
-    async def kernel(msg_id: int, channel_id: int):
-        for _ in range(3):  # Retry 3 times at most
-            try:
-                async with discord_api_semaphore:
-                    dest_msg = await bot.fetch_message(channel_id, msg_id)
-                async with discord_api_semaphore:
-                    await dest_msg.edit(
-                        msg.content,
-                        attachments=msg.attachments,
-                        components=msg.components,
-                        embeds=msg.embeds,
-                    )
-            except Exception as e:
-                await utils.discord_error_logger(bot, e)
-                # Wait for between 3 and 5 minutes before retrying
-                # to allow for momentary discord outages of particular
-                # servers
-                await aio.sleep(randint(180, 300))
-            else:
-                break
-        else:
-            logging.error(
-                f"Failed to update message {msg_id} in {channel_id} after 3 tries"
-            )
+    mirror_start_time = perf_counter()
 
-    await aio.gather(
-        *[kernel(msg_id, channel_id) for msg_id, channel_id in msgs_to_update],
-        return_exceptions=True,
+    async def kernel(
+        msg_id: int, channel_id: int, retries: Optional[int] = 0, delay: int = 0
+    ) -> None | KernelWorkDone:
+        await aio.sleep(delay)
+
+        try:
+            async with discord_api_semaphore:
+                dest_msg = await bot.fetch_message(channel_id, msg_id)
+            async with discord_api_semaphore:
+                await dest_msg.edit(
+                    msg.content,
+                    attachments=msg.attachments,
+                    components=msg.components,
+                    embeds=msg.embeds,
+                )
+        except Exception as e:
+            return KernelWorkDone(msg_id, channel_id, exception=e, retries=retries)
+        else:
+            return KernelWorkDone(msg_id, channel_id, dest_msg.id, retries=retries)
+
+    announce_jobs = [
+        aio.create_task(kernel(msg_id, channel_id))
+        for msg_id, channel_id in msgs_to_update
+    ]
+    completed = []
+    return_in = 15  # seconds
+    max_retries = 3
+    log_message: h.Message = await log_mirror_progress_to_discord(
+        bot,
+        0,
+        0,
+        0,
+        len(msgs_to_update),
+        msg,
+        mirror_start_time,
+        title="Mirror update progress",
     )
+
+    while True:
+        done, pending = await aio.wait(
+            announce_jobs,
+            timeout=return_in,
+            return_when=aio.ALL_COMPLETED,
+        )
+
+        successes = []
+        to_retry = []
+        failures = []
+
+        for task in done:
+            result: KernelWorkDone = task.result()
+            # If the result is an exception
+            if result.exception:
+                if result.retries + 1 < max_retries:
+                    # and if we have retries left
+                    # then we add it to the to_retry list
+                    to_retry.append(result)
+                else:
+                    # if we have no retries left
+                    # then we add it to the failures list
+                    # for logging only to the console
+                    failures.append(result)
+            else:
+                # If the result is not an exception
+                # then we add it to the successes list
+                successes.append(result)
+
+        completed.extend(successes)
+        completed.extend(failures)
+        announce_jobs = pending | set(
+            aio.create_task(
+                kernel(
+                    job.source_message_id,
+                    job.dest_channel_id,
+                    job.retries + 1,
+                    # Wait for between 3 and 5 minutes before retrying
+                    # to allow for momentary discord outages of particular
+                    # servers
+                    delay=randint(180, 300),
+                )
+            )
+            for job in to_retry
+        )
+
+        log_message = await log_mirror_progress_to_discord(
+            bot,
+            len([success for success in completed if success.exception is None]),
+            len(to_retry),
+            len(failures)
+            + len([success for success in completed if success.exception]),
+            len(pending),
+            msg,
+            mirror_start_time,
+            existing_message=log_message,
+        )
+
+        if len(pending) == 0:
+            break
 
 
 # Command group for all mirror commands
