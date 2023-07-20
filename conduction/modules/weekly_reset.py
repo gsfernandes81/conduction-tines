@@ -18,10 +18,13 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+from hmessage import HMessage as MessagePrototype
 
 from .. import cfg, utils
-from .autocmd import MessagePrototype, NavigatorView, NavPages
+from ..nav import NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
+
+REFERENCE_DATE = dt.datetime(2023, 7, 18, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["weekly_reset"]
 
@@ -37,15 +40,15 @@ class ResetPages(NavPages):
             .merge_attachements_into_embed()
         )
 
-    @classmethod
-    def period_around(cls, date: dt.datetime | None = None) -> t.Tuple[h.Snowflake]:
-        return utils.weekly_reset_period(date)
-
 
 async def on_start(event: h.StartedEvent):
     global reset_pages
     reset_pages = await ResetPages.from_channel(
-        event.app, FOLLOWABLE_CHANNEL, history_len=12
+        event.app,
+        FOLLOWABLE_CHANNEL,
+        history_len=12,
+        period=dt.timedelta(days=7),
+        reference_date=REFERENCE_DATE,
     )
 
 

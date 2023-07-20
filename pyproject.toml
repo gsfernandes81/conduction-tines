@@ -8,23 +8,23 @@ readme = "README.md"
 packages = [{ include = "conduction" }]
 
 [tool.poetry.dependencies]
-asyncmy = "^0.2.7rc6"
-hikari = { extras = ["speedups"], version = "==2.0.0.dev120" }
-# The below is a hikari/aiohttp speedups dependency
-faust-cchardet = "^2.1.18"
-uvloop = "^0.17.0"
-hikari-lightbulb = { version = "^2.3.1", extras = ["crontrigger"] }
-honcho = "^1.1.0"
-python = "~3.11.1"
-sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "ae0dcc9"}
-sqlalchemy = "^2.0.1"
 aiohttp = "^3.8.3"
-regex = "^2022.10.31"
-yarl = "^1.8.2"
-hikari-toolbox = "^0.1.5"
-hikari-miru = "^3.1"
+asyncmy = "^0.2.7rc6"
 asyncpg = "^0.27.0"
 dateparser = "^1.1.8"
+faust-cchardet = "^2.1.18"
+hikari = { extras = ["speedups"], version = "==2.0.0.dev120" }
+hikari-lightbulb = { version = "^2.3.1", extras = ["crontrigger"] }
+hikari-message = {git = "https://github.com/gs729/hikari-message.git", rev = "4e75598"}
+hikari-miru = "^3.1.2"
+hikari-toolbox = "^0.1.5"
+honcho = "^1.1.0"
+python = "~3.11.1"
+regex = "^2022.10.31"
+sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "ae0dcc9"}
+sqlalchemy = "^2.0.1"
+uvloop = "^0.17.0"
+yarl = "^1.8.2"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"

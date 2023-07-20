@@ -209,3 +209,16 @@ async def wait_till_lightbulb_started(bot: lb.BotApp):
     if not bot.d.has_lb_started:
         await bot.wait_for(lb.LightbulbStartedEvent, timeout=None)
         bot.d.has_lightbulb_started = True
+
+
+class space:
+    zero_width = "\u200b"
+    hair = "\u200a"
+    six_per_em = "\u2006"
+    thin = "\u2009"
+    punctuation = "\u2008"
+    four_per_em = "\u2005"
+    three_per_em = "\u2004"
+    figure = "\u2007"
+    en = "\u2002"
+    em = "\u2003"

@@ -93,6 +93,8 @@ log_channel = int(_getenv("LOG_CHANNEL"))
 reset_time_tolerance = dt.timedelta(minutes=60)
 # Whether to disable repeatedly failing legacy mirrors
 disable_bad_channels = str(_getenv("DISABLE_BAD_CHANNELS")).lower() == "true"
+# Emoji
+emoji = json.loads(_getenv("EMOJI"))
 
 # Kyber's links
 ls_rotation_webpage = _getenv("LS_ROTATION_WEBPAGE")

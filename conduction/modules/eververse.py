@@ -18,13 +18,15 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+from hmessage import HMessage as MessagePrototype
 
 from .. import cfg, utils
-from .autocmd import MessagePrototype, NavigatorView, NavPages
+from ..nav import NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
 
+REFERENCE_DATE = dt.datetime(2023, 7, 18, 17, tzinfo=dt.timezone.utc)
+
 EVERVERSE_WEEKLY = cfg.followables["eververse"]
-EVERVERSE_DAILY = cfg.followables["daily_reset"]
 
 
 class EVWeeklyPages(NavPages):
@@ -32,46 +34,25 @@ class EVWeeklyPages(NavPages):
     def preprocess_messages(
         cls, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
+        processed_messages = []
+        for n, m in enumerate(messages):
+            msg = MessagePrototype.from_message(m)
+            msg.embeds = []
+            msg.merge_content_into_embed(0)
+            msg.merge_attachements_into_embed(embed_no=0, default_url=cfg.default_url)
+            processed_messages.append(msg)
 
-        processed_messages = [
-            MessagePrototype.from_message(m)
-            .merge_content_into_embed(0)
-            .merge_attachements_into_embed(designator=n)
-            for n, m in enumerate(messages)
-        ]
         return utils.accumulate(processed_messages)
-
-    @classmethod
-    def period_around(cls, date: dt.datetime = None) -> t.Tuple[dt.datetime]:
-        return utils.weekly_reset_period(date)
-
-
-class EVDailyPages(NavPages):
-    @classmethod
-    def preprocess_messages(
-        cls, messages: t.List[MessagePrototype | h.Message]
-    ) -> MessagePrototype:
-        processed_messages = [
-            MessagePrototype.from_message(m)
-            .merge_content_into_embed(0)
-            .merge_attachements_into_embed(designator=n)
-            for n, m in enumerate(messages)
-        ]
-        return utils.accumulate(processed_messages)
-
-    @classmethod
-    def period_around(cls, date: dt.datetime = None) -> t.Tuple[dt.datetime]:
-        return utils.daily_reset_period(date)
 
 
 async def on_start(event: h.StartedEvent):
     global evweekly
     evweekly = await EVWeeklyPages.from_channel(
-        event.app, EVERVERSE_WEEKLY, history_len=4
-    )
-    global evdaily
-    evdaily = await EVDailyPages.from_channel(
-        event.app, EVERVERSE_DAILY, history_len=14
+        event.app,
+        EVERVERSE_WEEKLY,
+        history_len=4,
+        period=dt.timedelta(days=7),
+        reference_date=REFERENCE_DATE,
     )
 
 
@@ -89,16 +70,8 @@ async def eververse_weekly(ctx: lb.Context):
     await navigator.send(ctx.interaction)
 
 
-@eververse_group.child
-@lb.command("daily", "Find out about today's eververse offer")
-@lb.implements(lb.SlashSubCommand)
-async def eververse_daily(ctx: lb.Context):
-    navigator = NavigatorView(pages=evdaily, timeout=60, autodefer=True)
-    await navigator.send(ctx.interaction)
-
-
 def register(bot):
-    bot.command(eververse_group),
+    bot.command(eververse_group)
     bot.listen()(on_start)
 
     autopost_command_group.child(
@@ -107,14 +80,5 @@ def register(bot):
             "eververse_weekly",
             "Eververse weekly",
             "Eververse weekly auto posts",
-        )
-    )
-
-    autopost_command_group.child(
-        follow_control_command_maker(
-            EVERVERSE_DAILY,
-            "eververse_daily",
-            "Eververse daily",
-            "Eververse daily auto posts",
         )
     )

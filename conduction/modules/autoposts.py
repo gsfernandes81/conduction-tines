@@ -13,8 +13,6 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
-import logging
-import traceback as tb
 import typing as t
 from random import randint
 from typing import Optional
@@ -72,7 +70,7 @@ def follow_control_command_maker(
         # the user, so we use int instead, unsure if this is a lightbulb bug
         type=int,
     )
-    @lb.command(autoposts_name, autoposts_desc, pass_options=True)
+    @lb.command(autoposts_name, autoposts_desc, pass_options=True, auto_defer=True)
     @lb.implements(lb.SlashSubCommand)
     @utils.ensure_session(db_session)
     async def follow_control(

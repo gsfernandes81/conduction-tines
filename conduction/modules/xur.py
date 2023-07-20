@@ -18,10 +18,14 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+from hmessage import HMessage as MessagePrototype
+from hmessage import MultiImageEmbedList
 
 from .. import cfg, utils
-from .autocmd import MessagePrototype, NavigatorView, NavPages, MultiImageEmbedList
+from ..nav import NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
+
+REFERENCE_DATE = dt.datetime(2023, 7, 14, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["xur"]
 
@@ -51,19 +55,19 @@ class XurPages(NavPages):
         ).add_image(msg_proto.embeds[0].url)
         return msg_proto
 
-    @classmethod
-    def period_around(cls, date: dt.datetime | None = None) -> t.Tuple[h.Snowflake]:
-        return utils.xur_period(date)
-
 
 async def on_start(event: h.StartedEvent):
     global xur_pages
     xur_pages = await XurPages.from_channel(
-        event.app, FOLLOWABLE_CHANNEL, history_len=12
+        event.app,
+        FOLLOWABLE_CHANNEL,
+        history_len=12,
+        period=dt.timedelta(days=7),
+        reference_date=REFERENCE_DATE,
     )
 
 
-@lb.command("xur", "Find out what Xur has and where Xur isup")
+@lb.command("xur", "Find out what Xur has and where Xur is")
 @lb.implements(lb.SlashCommand)
 async def xur_command(ctx: lb.Context):
     navigator = NavigatorView(pages=xur_pages, timeout=60)
