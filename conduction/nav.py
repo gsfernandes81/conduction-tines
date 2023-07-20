@@ -18,6 +18,7 @@ import datetime as dt
 import typing as t
 from asyncio import sleep
 from random import randint
+import hikari
 from miru.ext import nav
 
 import abc
@@ -32,6 +33,8 @@ from .bot import CachedFetchBot
 from .cfg import reset_time_tolerance, embed_default_color
 
 from . import utils
+
+NO_DATA_HERE_EMBED = h.Embed(title="No data here!", color=embed_default_color)
 
 
 class DateRangeDict(dict):
@@ -131,6 +134,56 @@ class DateRangeDict(dict):
 
 
 class NavigatorView(_NavigatorView):
+    def __init__(
+        self,
+        *,
+        pages: t.Dict[dt.datetime, MessagePrototype],
+        timeout: t.Optional[t.Union[float, int, dt.timedelta]] = 120,
+        autodefer: bool = True,
+    ) -> None:
+        super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)
+        # Set current page to the first non blank page
+        while True:
+            try:
+                current_page = pages[self.current_page]
+                if (
+                    current_page.embeds
+                    and current_page.embeds[0] == NO_DATA_HERE_EMBED
+                    ):
+                    self.current_page = self.current_page - 1
+                else:
+                    break
+            except KeyError:
+                self.current_page = 0
+                break
+
+    @property
+    def current_page(self) -> int:
+        """
+        The current page of the navigator, zero-indexed integer.
+        """
+        return self._current_page
+
+    @current_page.setter
+    def current_page(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("Expected type int for property current_page.")
+
+        # Ensure this value is always correct
+        self._current_page = max(self.pages.limits[0], min(value, self.pages.limits[1]))
+
+    
+    async def send(
+        self,
+        to: t.Union[hikari.SnowflakeishOr[hikari.TextableChannel], hikari.MessageResponseMixin[t.Any]],
+        *,
+        start_at: t.Optional[int] = None,
+        ephemeral: bool = False,
+        responded: bool = False,
+    ):
+        # Override the default page number of 0 with the current page as set by init
+        return await super().send(to, start_at=start_at if start_at is not None else self.current_page, ephemeral=ephemeral, responded=responded)
+
     def _get_page_payload(
         self, page: t.Union[str, h.Embed, t.Sequence[h.Embed], MessagePrototype]
     ) -> t.MutableMapping[str, t.Any]:
@@ -267,9 +320,7 @@ class NavPages(DateRangeDict, abc.ABC):
             if self.get(key):
                 self[key] = self.preprocess_messages(self[key])
             else:
-                self[key] = MessagePrototype(
-                    embeds=[h.Embed(title="No data here!", color=embed_default_color)]
-                )
+                self[key] = MessagePrototype(embeds=[NO_DATA_HERE_EMBED])
             key += self.period
 
     async def _update_history(self, event: h.MessageCreateEvent | h.MessageUpdateEvent):
