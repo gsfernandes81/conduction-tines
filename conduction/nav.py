@@ -146,10 +146,7 @@ class NavigatorView(_NavigatorView):
         while True:
             try:
                 current_page = pages[self.current_page]
-                if (
-                    current_page.embeds
-                    and current_page.embeds[0] == NO_DATA_HERE_EMBED
-                    ):
+                if current_page.embeds and current_page.embeds[0] == NO_DATA_HERE_EMBED:
                     self.current_page = self.current_page - 1
                 else:
                     break
@@ -172,17 +169,24 @@ class NavigatorView(_NavigatorView):
         # Ensure this value is always correct
         self._current_page = max(self.pages.limits[0], min(value, self.pages.limits[1]))
 
-    
     async def send(
         self,
-        to: t.Union[hikari.SnowflakeishOr[hikari.TextableChannel], hikari.MessageResponseMixin[t.Any]],
+        to: t.Union[
+            hikari.SnowflakeishOr[hikari.TextableChannel],
+            hikari.MessageResponseMixin[t.Any],
+        ],
         *,
         start_at: t.Optional[int] = None,
         ephemeral: bool = False,
         responded: bool = False,
     ):
         # Override the default page number of 0 with the current page as set by init
-        return await super().send(to, start_at=start_at if start_at is not None else self.current_page, ephemeral=ephemeral, responded=responded)
+        return await super().send(
+            to,
+            start_at=start_at if start_at is not None else self.current_page,
+            ephemeral=ephemeral,
+            responded=responded,
+        )
 
     def _get_page_payload(
         self, page: t.Union[str, h.Embed, t.Sequence[h.Embed], MessagePrototype]
