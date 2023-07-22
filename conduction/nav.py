@@ -306,7 +306,8 @@ class NavPages(DateRangeDict, abc.ABC):
 
         # Bin messages into periods
         async for msg in self.channel.fetch_history(after=after - reset_time_tolerance):
-            msg_time = msg.edited_timestamp or msg.timestamp
+            msg_time = msg.timestamp
+
             start_of_period = self.round_down(msg_time)
 
             if not self.get(start_of_period):
