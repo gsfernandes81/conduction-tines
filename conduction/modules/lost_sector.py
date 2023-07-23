@@ -298,13 +298,28 @@ async def ls_group():
 @ls_group.child
 @lb.command("today", "Find out about today's lost sector")
 @lb.implements(lb.SlashSubCommand)
-async def lost_sector_today_command(ctx: lb.Context):
+async def ls_today_command(ctx: lb.Context):
+    navigator = NavigatorView(pages=sectors, timeout=60)
+    await navigator.send(ctx.interaction)
+
+
+@lb.command("lost", "Find out about today's lost sector")
+@lb.implements(lb.SlashCommandGroup)
+async def ls_group_2():
+    pass
+
+
+@ls_group_2.child
+@lb.command("sector", "Find out about today's lost sector")
+@lb.implements(lb.SlashSubCommand)
+async def lost_sector_command(ctx: lb.Context):
     navigator = NavigatorView(pages=sectors, timeout=60)
     await navigator.send(ctx.interaction)
 
 
 def register(bot: t.Union[CachedFetchBot, UserCommandBot]):
     bot.command(ls_group)
+    bot.command(ls_group_2)
     bot.listen()(on_start)
 
     autopost_command_group.child(
