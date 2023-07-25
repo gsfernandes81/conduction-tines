@@ -35,16 +35,31 @@ uvloop.install()
 bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
 
 
-@tasks.task(m=5, auto_start=True, wait_before_execution=False)
-async def autoupdate_status():
-    await utils.wait_till_lightbulb_started(bot)
-
+async def update_status(guild_count: int):
     await bot.update_presence(
         activity=h.Activity(
-            name="{} servers : )".format(len(await bot.rest.fetch_my_guilds())),
+            name="{} servers : )".format(guild_count),
             type=h.ActivityType.LISTENING,
         )
     )
+
+
+@bot.listen()
+async def on_start(event: lb.events.LightbulbStartedEvent):
+    bot.d.guild_count = len(await bot.rest.fetch_my_guilds())
+    await update_status(bot.d.guild_count)
+
+
+@bot.listen()
+async def on_guild_add(event: h.events.GuildJoinEvent):
+    bot.d.guild_count += 1
+    await update_status(bot.d.guild_count)
+
+
+@bot.listen()
+async def on_guild_rm(event: h.events.GuildLeaveEvent):
+    bot.d.guild_count -= 1
+    await update_status(bot.d.guild_count)
 
 
 _modules = map(modules.__dict__.get, modules.__all__)
