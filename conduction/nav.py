@@ -49,27 +49,33 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
     limits: t.Tuple[dt.datetime, dt.datetime]
         The upper and lower bounds of the dict"""
 
-    def __init__(self, period: dt.timedelta, limits: t.Tuple[dt.datetime, dt.datetime]):
+    def __init__(
+        self,
+        period: dt.timedelta,
+        limits: t.Optional[t.Tuple[dt.datetime, dt.datetime]] = None,
+    ):
         if not isinstance(period, dt.timedelta):
             raise TypeError("period must be of type datetime.timedelta")
 
-        if len(limits) != 2:
-            raise ValueError("limits must be a tuple of length 2")
-
-        if not all(isinstance(l, dt.datetime) for l in limits):
-            raise TypeError("limits must be a tuple of datetime.datetime")
-
-        if limits[0] > limits[1]:
-            raise ValueError("limits[0] must be less than limits[1]")
-
-        if limits[1] - limits[0] < period:
-            raise ValueError("limits must be at least one period apart")
-
-        if (limits[1] - limits[0]) % period != dt.timedelta(0):
-            raise ValueError("limits must be an integer multiple of period apart")
-
         self.period = period
-        self.limits = limits
+
+        if limits:
+            if len(limits) != 2:
+                raise ValueError("limits must be a tuple of length 2")
+
+            if not all(isinstance(l, dt.datetime) for l in limits):
+                raise TypeError("limits must be a tuple of datetime.datetime")
+
+            if limits[0] > limits[1]:
+                raise ValueError("limits[0] must be less than limits[1]")
+
+            if limits[1] - limits[0] < period:
+                raise ValueError("limits must be at least one period apart")
+
+            if (limits[1] - limits[0]) % period != dt.timedelta(0):
+                raise ValueError("limits must be an integer multiple of period apart")
+
+            self.limits = limits
 
     def round_down(self, key: dt.datetime) -> dt.datetime:
         """Round down key to nearest period"""
@@ -90,6 +96,7 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
         if not (self.limits[0] <= key <= self.limits[1]):
             raise KeyError(f"Key {key} is not in range {self.limits}")
 
+        self._truncate_outside_limits()
         key = self.round_down(key)
         return super().__getitem__(key)
 
@@ -100,16 +107,9 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
         if not (self.limits[0] <= key <= self.limits[1]):
             raise KeyError(f"Key {key} is not in range {self.limits}")
 
+        self._truncate_outside_limits()
         key = self.round_down(key)
         super().__setitem__(key, value)
-
-    def advance(self, n: int = 1) -> None:
-        """Advance our limits by n periods"""
-        self.limits = (
-            self.limits[0] + n * self.period,
-            self.limits[1] + n * self.period,
-        )
-        self._truncate_outside_limits()
 
     def _truncate_outside_limits(self) -> None:
         """Remove all keys outside our limits"""
@@ -274,19 +274,23 @@ class NavPages(DateRangeDict, abc.ABC):
         lookahead_len: int = 0,
         lookahead_update_interval: int = 1800,
     ):
+        super().__init__(period)
         self.history_len = history_len
         self.lookahead_len = lookahead_len
-
-        midpoint = self.nearest_limit_from_period_and_ref(
-            period=period, ref=reference_date
-        )
-        limit_low = midpoint - period * (history_len - 1)
-        limit_high = midpoint + period * lookahead_len
-        super().__init__(period, limits=(limit_low, limit_high))
-
         self.channel = channel
         self.bot: CachedFetchBot = channel.app
         self.lookahead_update_interval = lookahead_update_interval
+
+        self._reference_date = reference_date
+
+    @property
+    def limits(self) -> t.Tuple[dt.datetime, dt.datetime]:
+        midpoint = self.nearest_limit_from_period_and_ref(
+            period=self.period, ref=self._reference_date
+        )
+        limit_low = midpoint - self.period * (self.history_len - 1)
+        limit_high = midpoint + self.period * self.lookahead_len
+        return (limit_low, limit_high)
 
     @classmethod
     @abc.abstractmethod
