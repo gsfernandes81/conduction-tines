@@ -34,15 +34,26 @@ class EVWeeklyPages(NavPages):
     def preprocess_messages(
         cls, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
-        processed_messages = []
-        for n, m in enumerate(messages):
-            msg = MessagePrototype.from_message(m)
-            msg.embeds = []
-            msg.merge_content_into_embed(0)
-            msg.merge_attachements_into_embed(embed_no=0, default_url=cfg.default_url)
-            processed_messages.append(msg)
+        msg: MessagePrototype = utils.accumulate(
+            [MessagePrototype.from_message(msg) for msg in messages]
+        )
 
-        return utils.accumulate(processed_messages)
+        # Stop discord from making new auto embeds
+        msg.content = (
+            cfg.url_regex.sub(lambda x: f"<{x.group()}>", msg.content)
+            .replace("<<", "<")
+            .replace(">>", ">")
+        )
+        # Remove discord auto image embeds
+        msg.embeds = list(
+            filter(
+                lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds
+            )
+        )
+        # Remove embeds with no title or description
+        msg.embeds = list(filter(lambda x: x.title or x.description, msg.embeds))
+
+        return msg
 
 
 async def on_start(event: h.StartedEvent):
