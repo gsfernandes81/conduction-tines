@@ -14,30 +14,27 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 # Define our custom navigator class
+import abc
 import datetime as dt
 import typing as t
 from asyncio import sleep
 from random import randint
-import hikari
-from miru.ext import nav
 
-import abc
 import hikari as h
 import lightbulb as lb
 import miru as m
 from hmessage import HMessage as MessagePrototype
 from lightbulb.ext import tasks
-from miru.ext.nav import NavigatorView as _NavigatorView, NavItem
-
-from .bot import CachedFetchBot
-from .cfg import reset_time_tolerance, embed_default_color
+from miru.ext import nav
 
 from . import utils
+from .bot import CachedFetchBot
+from .cfg import embed_default_color, reset_time_tolerance
 
 NO_DATA_HERE_EMBED = h.Embed(title="No data here!", color=embed_default_color)
 
 
-class DateRangeDict(dict):
+class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
     """Dict with keys that are contiguous date ranges up to limits
 
     The keys of the backing dict are the start of the date ranges.
@@ -84,7 +81,7 @@ class DateRangeDict(dict):
             self.round_down(dt.datetime.now(tz=dt.timezone.utc)) + index * self.period
         )
 
-    def __getitem__(self, key: dt.datetime | int) -> t.Any:
+    def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
         if isinstance(key, int):
             key = self.index_to_date(key)
         if not isinstance(key, dt.datetime):
@@ -96,7 +93,7 @@ class DateRangeDict(dict):
         key = self.round_down(key)
         return super().__getitem__(key)
 
-    def __setitem__(self, key: dt.datetime, value: t.Any) -> None:
+    def __setitem__(self, key: dt.datetime, value: MessagePrototype) -> None:
         if not isinstance(key, dt.datetime):
             raise TypeError("Key must be of type datetime.datetime")
 
@@ -133,15 +130,16 @@ class DateRangeDict(dict):
         return ((now - ref) // period) * period + ref
 
 
-class NavigatorView(_NavigatorView):
+class NavigatorView(nav.NavigatorView):
     def __init__(
         self,
         *,
-        pages: t.Dict[dt.datetime, MessagePrototype],
+        pages: "NavPages",
         timeout: t.Optional[t.Union[float, int, dt.timedelta]] = 120,
         autodefer: bool = True,
     ) -> None:
         super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)
+        self._pages = pages
         # Set current page to the first non blank page
         while True:
             try:
@@ -154,26 +152,11 @@ class NavigatorView(_NavigatorView):
                 self.current_page = 0
                 break
 
-    @property
-    def current_page(self) -> int:
-        """
-        The current page of the navigator, zero-indexed integer.
-        """
-        return self._current_page
-
-    @current_page.setter
-    def current_page(self, value: int) -> None:
-        if not isinstance(value, int):
-            raise TypeError("Expected type int for property current_page.")
-
-        # Ensure this value is always correct
-        self._current_page = max(self.pages.limits[0], min(value, self.pages.limits[1]))
-
     async def send(
         self,
         to: t.Union[
-            hikari.SnowflakeishOr[hikari.TextableChannel],
-            hikari.MessageResponseMixin[t.Any],
+            h.SnowflakeishOr[h.TextableChannel],
+            h.MessageResponseMixin[t.Any],
         ],
         *,
         start_at: t.Optional[int] = None,
@@ -224,10 +207,10 @@ class NavigatorView(_NavigatorView):
         page = self.pages[self.current_page]
 
         for button in self.children:
-            if isinstance(button, NavItem):
+            if isinstance(button, nav.NavItem):
                 await button.before_page_change()
 
-        payload = self.get_page_payload(page)
+        payload = self._get_page_payload(page)
 
         self._inter = context.interaction  # Update latest inter
 
@@ -242,6 +225,33 @@ class NavigatorView(_NavigatorView):
             payload = {"attachment": None, **payload}
 
         await context.edit_response(**payload)
+
+    def get_default_buttons(self) -> t.Sequence[nav.NavButton]:
+        return [PrevButton(), IndicatorButton(), NextButton()]
+
+    @property
+    def pages(self) -> "NavPages":
+        """
+        The pages that the navigator is navigating.
+        """
+        return self._pages
+
+    @property
+    def current_page(self) -> int:
+        """
+        The current page of the navigator, zero-indexed integer.
+        """
+        return self._current_page
+
+    @current_page.setter
+    def current_page(self, value: int) -> None:
+        if not isinstance(value, int):
+            raise TypeError("Expected type int for property current_page.")
+
+        # Ensure this value is always correct
+        self._current_page = max(
+            -(self.pages.history_len - 1), min(value, self.pages.lookahead_len)
+        )
 
 
 class NavPages(DateRangeDict, abc.ABC):
@@ -398,43 +408,6 @@ class NavPages(DateRangeDict, abc.ABC):
         return {}
 
 
-class NavigatorView(NavigatorView):
-    def __init__(
-        self,
-        *,
-        pages: NavPages,
-        timeout: t.Optional[t.Union[float, int, dt.timedelta]] = 120,
-        autodefer: bool = True,
-    ) -> None:
-        super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)
-
-    def get_page_payload(self, page: MessagePrototype) -> t.MutableMapping[str, t.Any]:
-        """Get the page content that is to be sent."""
-        if self.ephemeral:
-            return dict(
-                **page.to_message_kwargs(),
-                flags=h.MessageFlag.EPHEMERAL,
-            )
-        else:
-            return dict(**page.to_message_kwargs(), components=self)
-
-    @property
-    def current_page(self) -> int:
-        """
-        The current page of the navigator, zero-indexed integer.
-        """
-        return self._current_page
-
-    @current_page.setter
-    def current_page(self, value: int) -> None:
-        if not isinstance(value, int):
-            raise TypeError("Expected type int for property current_page.")
-        self._current_page = value
-
-    def get_default_buttons(self) -> t.Sequence[nav.NavButton]:
-        return [PrevButton(), IndicatorButton(), NextButton()]
-
-
 class IndicatorButton(nav.IndicatorButton):
     """
     A built-in NavButton to indicate the current page.
@@ -483,9 +456,6 @@ class NextButton(nav.NavButton):
         await self.view.send_page(context)
 
     async def before_page_change(self) -> None:
-        self._before_page_change()
-
-    def _before_page_change(self) -> None:
         if self.view.current_page >= self.view.pages.lookahead_len:
             self.disabled = True
         else:
