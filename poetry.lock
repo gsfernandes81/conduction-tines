@@ -454,14 +454,14 @@ files = [
 
 [[package]]
 name = "certifi"
-version = "2023.5.7"
+version = "2023.7.22"
 description = "Python package for providing Mozilla's CA Bundle."
 category = "main"
 optional = false
 python-versions = ">=3.6"
 files = [
-    {file = "certifi-2023.5.7-py3-none-any.whl", hash = "sha256:c6c2e98f5c7869efca1f8916fed228dd91539f9f1b444c314c06eef02980c716"},
-    {file = "certifi-2023.5.7.tar.gz", hash = "sha256:0f0d56dc5a6ad56fd4ba36484d6cc34451e1c6548c61daad8c320169f91eddc7"},
+    {file = "certifi-2023.7.22-py3-none-any.whl", hash = "sha256:92d6037539857d8206b8f6ae472e8b77db8058fec5937a1ef3f54304089edbb9"},
+    {file = "certifi-2023.7.22.tar.gz", hash = "sha256:539cc1d13202e33ca466e88b2807e29f4c13049d6d87031a3c110744495cb082"},
 ]
 
 [[package]]
@@ -1128,8 +1128,8 @@ yarl = "^1.9.2"
 [package.source]
 type = "git"
 url = "https://github.com/gs729/hikari-message.git"
-reference = "4e75598"
-resolved_reference = "4e7559851783450b1b0275d4e10289d03261f92b"
+reference = "61fc9f0"
+resolved_reference = "61fc9f0c1132b50ca7697c81d4cc7fbbec15a901"
 
 [[package]]
 name = "hikari-miru"
@@ -2297,4 +2297,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.1"
-content-hash = "391e7f251732c89f4f9748f80dce095299f44c040f7eeaf844215395695f81d6"
+content-hash = "1d9b0af570a043bceb5bdf51b915185f00d3a05301cfd3088913e11fdedae8e5"

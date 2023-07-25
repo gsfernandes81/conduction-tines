@@ -15,7 +15,7 @@ dateparser = "^1.1.8"
 faust-cchardet = "^2.1.18"
 hikari = { extras = ["speedups"], version = "==2.0.0.dev120" }
 hikari-lightbulb = { version = "^2.3.1", extras = ["crontrigger"] }
-hikari-message = {git = "https://github.com/gs729/hikari-message.git", rev = "4e75598"}
+hikari-message = {git = "https://github.com/gs729/hikari-message.git", rev = "61fc9f0"}
 hikari-miru = "^3.1.2"
 hikari-toolbox = "^0.1.5"
 honcho = "^1.1.0"
