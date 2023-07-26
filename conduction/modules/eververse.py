@@ -29,36 +29,9 @@ REFERENCE_DATE = dt.datetime(2023, 7, 18, 17, tzinfo=dt.timezone.utc)
 EVERVERSE_WEEKLY = cfg.followables["eververse"]
 
 
-class EVWeeklyPages(NavPages):
-    @classmethod
-    def preprocess_messages(
-        cls, messages: t.List[MessagePrototype | h.Message]
-    ) -> MessagePrototype:
-        msg: MessagePrototype = utils.accumulate(
-            [MessagePrototype.from_message(msg) for msg in messages]
-        )
-
-        # Stop discord from making new auto embeds
-        msg.content = (
-            cfg.url_regex.sub(lambda x: f"<{x.group()}>", msg.content)
-            .replace("<<", "<")
-            .replace(">>", ">")
-        )
-        # Remove discord auto image embeds
-        msg.embeds = list(
-            filter(
-                lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds
-            )
-        )
-        # Remove embeds with no title or description
-        msg.embeds = list(filter(lambda x: x.title or x.description, msg.embeds))
-
-        return msg
-
-
 async def on_start(event: h.StartedEvent):
     global evweekly
-    evweekly = await EVWeeklyPages.from_channel(
+    evweekly = await NavPages.from_channel(
         event.app,
         EVERVERSE_WEEKLY,
         history_len=4,
