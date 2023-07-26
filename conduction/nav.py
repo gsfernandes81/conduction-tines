@@ -77,9 +77,17 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
 
             self.limits = limits
 
-    def round_down(self, key: dt.datetime) -> dt.datetime:
-        """Round down key to nearest period"""
-        return ((key - self.limits[0]) // self.period) * self.period + self.limits[0]
+    def round_down(
+        self,
+        key: dt.datetime,
+        tolerance: t.Optional[dt.timedelta] = reset_time_tolerance,
+    ) -> dt.datetime:
+        """Round down key to nearest period with tolerance in the negative direction
+
+        The tolerance parameter allows for rounding up by its value"""
+        return (
+            (key + tolerance - self.limits[0]) // self.period
+        ) * self.period + self.limits[0]
 
     def index_to_date(self, index: int) -> dt.datetime:
         """Return the datetime of the period at <index>"""
