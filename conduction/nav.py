@@ -13,8 +13,7 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
-# Define our custom navigator class
-import abc
+# Define our custom navigator classes
 import datetime as dt
 import typing as t
 from asyncio import sleep
@@ -29,7 +28,7 @@ from miru.ext import nav
 
 from . import utils
 from .bot import CachedFetchBot
-from .cfg import embed_default_color, reset_time_tolerance
+from .cfg import embed_default_color, reset_time_tolerance, url_regex
 
 NO_DATA_HERE_EMBED = h.Embed(title="No data here!", color=embed_default_color)
 
@@ -262,7 +261,7 @@ class NavigatorView(nav.NavigatorView):
         )
 
 
-class NavPages(DateRangeDict, abc.ABC):
+class NavPages(DateRangeDict):
     """Class to maintain a dict of slash command responses over time.
 
     The key for the dict is the datetime after which the response was posted
@@ -270,17 +269,36 @@ class NavPages(DateRangeDict, abc.ABC):
     Additionally the key also accepts an int and interprets it as n periods
     since the currrent datetime rounded down.
 
-    __init__ registers tasks to update the dict regularly based on history_update_interval
-    and lookahead_update_interval."""
+    __init__ registers tasks to update the dict regularly based on the
+    lookahead_update_interval.
+
+    Parameters
+    channel: h.GuildNewsChannel
+        The channel to fetch messages from
+    period: dt.timedelta
+        The period between each key
+    reference_date: dt.datetime
+        The date to use as the reference for the 0 key
+    history_len: int
+        The number of periods to keep in the past
+    lookahead_len: int
+        The number of periods to keep in the future
+    lookahead_update_interval: int
+        The number of seconds between each update of the lookahead
+    suppress_content_autoembeds: bool
+        Instructs the default preprocess_messages method to stop discord link auto
+        embeds based on message content
+    """
 
     def __init__(
         self,
         channel: h.GuildNewsChannel,
         period: dt.timedelta,
         reference_date: dt.datetime,
-        history_len: int = 7,
-        lookahead_len: int = 0,
-        lookahead_update_interval: int = 1800,
+        history_len: t.Optional[int] = 7,
+        lookahead_len: t.Optional[int] = 0,
+        lookahead_update_interval: t.Optional[int] = 1800,
+        suppress_content_autoembeds: t.Optional[bool] = True,
     ):
         super().__init__(period)
         self.history_len = history_len
@@ -290,6 +308,7 @@ class NavPages(DateRangeDict, abc.ABC):
         self.lookahead_update_interval = lookahead_update_interval
 
         self._reference_date = reference_date
+        self._suppress_content_autoembeds = suppress_content_autoembeds
 
     @property
     def limits(self) -> t.Tuple[dt.datetime, dt.datetime]:
@@ -300,12 +319,31 @@ class NavPages(DateRangeDict, abc.ABC):
         limit_high = midpoint + self.period * self.lookahead_len
         return (limit_low, limit_high)
 
-    @classmethod
-    @abc.abstractmethod
     def preprocess_messages(
-        cls, messages: t.List[MessagePrototype | h.Message]
+        self, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
-        pass
+        msg: MessagePrototype = utils.accumulate(
+            [MessagePrototype.from_message(msg) for msg in messages]
+        )
+
+        if self._suppress_content_autoembeds:
+            # Stop discord from making new auto embeds
+            msg.content = (
+                url_regex.sub(lambda x: f"<{x.group()}>", msg.content)
+                .replace("<<", "<")
+                .replace(">>", ">")
+            )
+
+        # Remove discord auto image embeds
+        msg.embeds = list(
+            filter(
+                lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds
+            )
+        )
+        # Remove embeds with no title or description
+        msg.embeds = list(filter(lambda x: x.title or x.description, msg.embeds))
+
+        return msg
 
     @classmethod
     async def from_channel(cls, bot: CachedFetchBot, channel, **kwargs) -> t.Self:
