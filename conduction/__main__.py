@@ -38,7 +38,9 @@ bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
 async def update_status(guild_count: int):
     await bot.update_presence(
         activity=h.Activity(
-            name="{} servers : )".format(guild_count),
+            name="{} servers : )".format(guild_count)
+            if not cfg.test_env
+            else "DEBUG MODE",
             type=h.ActivityType.LISTENING,
         )
     )
