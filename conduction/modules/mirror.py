@@ -843,6 +843,32 @@ async def undo_auto_disable(ctx: lb.Context, from_date: str):
     await ctx.respond(response)
 
 
+@mirror_group.child
+@lb.option("dest_server_id", description="Destination server id")
+@lb.option("dest", description="Destination channel")
+@lb.option("src", description="Source channel")
+@lb.command(
+    "manual_add",
+    description="Manually add a mirror to the database",
+    guilds=[cfg.control_discord_server_id],
+    pass_options=True,
+    auto_defer=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def manual_add(ctx: lb.Context, src: str, dest: str, dest_server_id: str):
+    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
+        return
+
+    src = int(src)
+    dest = int(dest)
+    dest_server_id = int(dest_server_id)
+
+    await MirroredChannel.add_mirror(
+        src, dest, dest_server_id=dest_server_id, legacy=True
+    )
+    await ctx.respond("Added mirror")
+
+
 def register(bot):
     for event_handler in [
         message_create_repeater,
