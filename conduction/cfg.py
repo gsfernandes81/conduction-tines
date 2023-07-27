@@ -104,3 +104,18 @@ ls_infogfx_webpage = _getenv("LS_INFOGFX_WEBPAGE")
 url_regex = re.compile(
     "http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
 )
+
+# General constants
+IMAGE_EXTENSIONS_LIST = [
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".tiff",
+    ".tif",
+    ".heif",
+    ".heifs",
+    ".heic",
+    ".heics",
+    ".webp",
+]
