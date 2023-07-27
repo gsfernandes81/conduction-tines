@@ -132,6 +132,7 @@ async def format_sector(
     secondary_image: h.Attachment | None = None,
     secondary_embed_title: str | None = "",
     secondary_embed_description: str | None = "",
+    date: dt.datetime = None,
 ) -> MessagePrototype:
     # Follow the hyperlink to have the newest image embedded
     try:
@@ -177,9 +178,15 @@ async def format_sector(
         sector_name = sector.name
         sector_location = None
 
+    if date:
+        suffix = utils.get_ordinal_suffix(date.day)
+        title = f"Lost Sector for {date.strftime('%B %-d')}{suffix}"
+    else:
+        title = "Lost Sector Today"
+
     embed = (
         h.Embed(
-            title="**Lost Sector Today**",
+            title=f"**{title}**",
             description=(
                 f"{cfg.emoji['ls']}{space.three_per_em}{sector_name}\n"
                 + (
@@ -271,7 +278,7 @@ class SectorMessages(NavPages):
             # Follow the hyperlink to have the newest image embedded
             lookahead_dict = {
                 **lookahead_dict,
-                date: await format_sector(sector),
+                date: await format_sector(sector, date=date),
             }
 
         return lookahead_dict
