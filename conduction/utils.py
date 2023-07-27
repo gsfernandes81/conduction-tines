@@ -134,7 +134,10 @@ async def discord_error_logger(
     logging.error(f"Error reference: {error_reference}")
 
 
-def accumulate(iterable):
+T = t.TypeVar("T")
+
+
+def accumulate(iterable: t.Iterable[T]) -> T:
     final = iterable[0]
     for arg in iterable[1:]:
         final = final + arg
