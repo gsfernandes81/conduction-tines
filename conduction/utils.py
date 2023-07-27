@@ -105,11 +105,7 @@ async def discord_error_logger(
     if not error_reference:
         error_reference = randint(1000000, 9999999)
 
-    error_message = (
-        f"Exception with error reference `{error_reference}`:\n```"
-        + "\n".join(tb.format_exception(e))
-        + "\n```"
-    )
+    error_message = "\n".join(tb.format_exception(e))
 
     log_channel = await bot.fetch_channel(cfg.log_channel)
     error_message_chunk = ""
