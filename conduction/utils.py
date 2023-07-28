@@ -107,7 +107,7 @@ async def discord_error_logger(
 
     error_message = "\n".join(tb.format_exception(e))
 
-    log_channel = await bot.fetch_channel(cfg.log_channel)
+    alerts_channel = await bot.fetch_channel(cfg.alerts_channel)
     error_message_chunk = ""
 
     async with error_logger_semaphore:
@@ -121,12 +121,12 @@ async def discord_error_logger(
                 error_message_chunk += error_msg_line + "\n"
             else:
                 # And send each chunk
-                await log_channel.send("```\n" + error_message_chunk + "\n```")
+                await alerts_channel.send("```\n" + error_message_chunk + "\n```")
                 error_message_chunk = ""
 
         else:
             # Send the final chunk
-            await log_channel.send(error_message_chunk)
+            await alerts_channel.send(error_message_chunk)
     logging.error(f"Error reference: {error_reference}")
 
 
