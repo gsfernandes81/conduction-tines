@@ -263,8 +263,10 @@ class UserCommandBot(lb.BotApp):
                 # url into the text and respond with it
                 await ctx.respond(
                     cfg.url_regex.sub("{}", text).format(
-                        await utils.follow_link_single_step(link)
-                        for link in cfg.url_regex.findall(text)
+                        *[
+                            await utils.follow_link_single_step(link)
+                            for link in cfg.url_regex.findall(text)
+                        ]
                     )
                 )
 
