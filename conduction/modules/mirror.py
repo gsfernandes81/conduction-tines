@@ -216,9 +216,44 @@ async def log_mirror_progress_to_discord(
             await aio.sleep(5)
 
 
+def ignore_non_kyber_servers(func):
+    async def wrapped_func(event: h.MessageEvent):
+        if isinstance(event, h.MessageCreateEvent) or isinstance(
+            event, h.MessageUpdateEvent
+        ):
+            msg = event.message
+        elif isinstance(event, h.MessageDeleteEvent):
+            msg = event.old_message
+
+        if (
+            # If event is from Kyber's server, keep going
+            (
+                msg
+                and msg.guild_id
+                in [cfg.kyber_discord_server_id, cfg.control_discord_server_id]
+            )
+            # also keep going if we are running in a test env
+            # keep this towards the end so short circuiting in test_env
+            # does not hide logic errors
+            or cfg.test_env
+        ):
+            return await func(event)
+
+    return wrapped_func
+
+
+@ignore_non_kyber_servers
 async def message_create_repeater(event: h.MessageCreateEvent):
     msg = event.message
     bot = event.app
+
+    if (
+        # If event is not from Kyber's server, do not hit db for it
+        not (msg.guild_id and msg.guild_id == cfg.kyber_discord_server_id)
+        # unless we are running in a test env
+        and not cfg.test_env
+    ):
+        return
 
     backoff_timer = 30
     while True:
@@ -471,6 +506,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                 )
 
 
+@ignore_non_kyber_servers
 async def message_update_repeater(event: h.MessageUpdateEvent):
     msg = event.message
     bot = event.app
@@ -606,6 +642,7 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             break
 
 
+@ignore_non_kyber_servers
 async def message_delete_repeater(event: h.MessageDeleteEvent):
     msg_id = event.message_id
     msg = event.old_message
@@ -870,11 +907,8 @@ async def manual_add(ctx: lb.Context, src: str, dest: str, dest_server_id: str):
 
 
 def register(bot):
-    for event_handler in [
-        message_create_repeater,
-        message_update_repeater,
-        message_delete_repeater,
-    ]:
-        bot.listen()(event_handler)
+    bot.listen(h.MessageCreateEvent)(message_create_repeater)
+    bot.listen(h.MessageUpdateEvent)(message_update_repeater)
+    bot.listen(h.MessageDeleteEvent)(message_delete_repeater)
 
     bot.command(mirror_group)
