@@ -409,15 +409,22 @@ class NavPages(DateRangeDict):
         for retry_no in range(retries):
             try:
                 if isinstance(event.message, h.Message):
-                    pass
+                    msg = event.message
                 elif isinstance(event.message, h.PartialMessage):
                     msg = await self.bot.fetch_message(
                         event.channel_id, event.message_id
                     )
                 elif isinstance(event.message, h.Snowflakeish):
                     msg = await self.bot.fetch_message(event.channel_id, event.message)
+                else:
+                    raise ValueError(f"Unknown message type {event.message.__class__}")
 
-                if not (self.limits[0] <= msg.timestamp <= self.limits[1]):
+                if not (
+                    self.limits[0] <= self.round_down(msg.timestamp) <= self.limits[1]
+                ):
+                    logging.info(
+                        f"Message {msg.id} not in limits {self.limits}. Ignoring"
+                    )
                     return
 
                 # Get all messages in this event's message's period
