@@ -101,7 +101,7 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
             raise TypeError("Key must be of type datetime.datetime")
 
         if not (self.limits[0] <= key <= self.limits[1]):
-            raise KeyError(f"Key {key} is not in range {self.limits}")
+            raise IndexError(f"Key {key} is not in range {self.limits}")
 
         self._truncate_outside_limits()
         key = self.round_down(key)
@@ -112,7 +112,7 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
             raise TypeError("Key must be of type datetime.datetime")
 
         if not (self.limits[0] <= key <= self.limits[1]):
-            raise KeyError(f"Key {key} is not in range {self.limits}")
+            raise IndexError(f"Key {key} is not in range {self.limits}")
 
         self._truncate_outside_limits()
         key = self.round_down(key)
@@ -155,7 +155,7 @@ class NavigatorView(nav.NavigatorView):
                     self.current_page = self.current_page - 1
                 else:
                     break
-            except KeyError:
+            except IndexError:
                 self.current_page = 0
                 break
 
@@ -310,6 +310,12 @@ class NavPages(DateRangeDict):
         self._reference_date = reference_date
         self._suppress_content_autoembeds = suppress_content_autoembeds
 
+    def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
+        try:
+            return super().__getitem__(key)
+        except KeyError:
+            return MessagePrototype(embeds=[NO_DATA_HERE_EMBED])
+
     @property
     def limits(self) -> t.Tuple[dt.datetime, dt.datetime]:
         midpoint = self.nearest_limit_from_period_and_ref(
@@ -384,8 +390,6 @@ class NavPages(DateRangeDict):
         while key <= self.limits[1]:
             if self.get(key):
                 self[key] = self.preprocess_messages(self[key])
-            else:
-                self[key] = MessagePrototype(embeds=[NO_DATA_HERE_EMBED])
             key += self.period
 
     async def _update_history(self, event: h.MessageCreateEvent | h.MessageUpdateEvent):
