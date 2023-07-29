@@ -25,16 +25,28 @@ logger = logging.getLogger(__name__.split(".")[-1])
 logger.setLevel(logging.INFO)
 
 
+@lb.command(
+    "migrate",
+    description="Migrate data from the old bot",
+    hidden=True,
+    guilds=[cfg.control_discord_server_id],
+)
+@lb.implements(lb.SlashCommandGroup)
+async def migrate_group(ctx: lb.Context):
+    pass
+
+
+@migrate_group.child
 @lb.option("dry_run", description="Do not commit changes", default=True)
 @lb.command(
-    "migrate_mirror",
+    "mirrors",
     description="Migrate mirror data from the old bot",
     hidden=True,
     pass_options=True,
     guilds=[cfg.control_discord_server_id],
     auto_defer=True,
 )
-@lb.implements(lb.SlashCommand)
+@lb.implements(lb.SlashSubCommand)
 async def migrate_mirror(ctx: lb.Context, dry_run: bool = True):
     bot: lb.BotApp = ctx.bot
 
@@ -101,5 +113,66 @@ async def migrate_mirror(ctx: lb.Context, dry_run: bool = True):
     await ctx.edit_last_response(completion_message)
 
 
+@migrate_group.child
+@lb.option("dry_run", description="Do not commit changes", default=True)
+@lb.command(
+    "cmds",
+    description="Migrate mirror data from the old bot",
+    hidden=True,
+    pass_options=True,
+    guilds=[cfg.control_discord_server_id],
+    auto_defer=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def migrate_cmds(ctx: lb.Context, dry_run: bool = True):
+    bot: lb.BotApp = ctx.bot
+
+    if ctx.author.id not in await bot.fetch_owner_ids():
+        logger.error("Unauthorised user attempted to migrate mirrors")
+        return
+
+    async with schemas.db_session() as session:
+        async with session.begin():
+            await ctx.respond("Migrating commands...")
+
+            for old_command in await schemas.OldUserCommand.get_all(session=session):
+                try:
+                    await schemas.UserCommand.add_command(
+                        str(old_command.name),
+                        description=str(old_command.description),
+                        response_type=1,  # Plaintext
+                        response_data=str(old_command.response),
+                        session=session,
+                    )
+                except Exception as e:
+                    logging.exception(e)
+                else:
+                    logging.info(f"Migrated {old_command.name}")
+                    logging.info(f"Description: {old_command.description}")
+                    logging.info(f"Response: {old_command.response}")
+
+            if dry_run:
+                await session.rollback()
+                await ctx.edit_last_response("Dry run complete, rolled back")
+                logger.info("Dry run complete, rolled back")
+            else:
+                await ctx.edit_last_response("Committing changes")
+                logger.info("Committing changes")
+                await bot.sync_application_commands(session=session)
+
+    completion_message = "\n".join(
+        [
+            "Changes commited" if not dry_run else "Dry run complete, rolled back",
+            "UserCommand now has "
+            + str(len(await schemas.UserCommand.fetch_commands()))
+            + " commands. OldUserCommand had "
+            + str(len(await schemas.OldUserCommand.get_all()))
+            + "  commands.",
+        ]
+    )
+
+    await ctx.edit_last_response(completion_message)
+
+
 def register(bot: lb.BotApp):
-    bot.command(migrate_mirror)
+    bot.command(migrate_group)

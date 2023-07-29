@@ -1163,6 +1163,22 @@ class XurAutopostChannel(OldBaseChannelRecord, OldBase):
     pass
 
 
+class OldUserCommand(OldBase):
+    __tablename__ = "commands"
+    __mapper_args__ = {"eager_defaults": True}
+    name = Column("name", String, primary_key=True)
+    description = Column("description", String)
+    response = Column("response", String)
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def get_all(cls, session: Optional[AsyncSession] = None):
+        cmds = await session.execute(select(cls))
+        cmds = cmds if cmds else []
+        cmds = [cmd[0] for cmd in cmds]
+        return cmds
+
+
 async def recreate_all():
     # db_engine = create_engine(cfg.db_url, connect_args=cfg.db_connect_args)
     db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
