@@ -394,31 +394,40 @@ class NavPages(DateRangeDict):
 
     async def _update_history(self, event: h.MessageCreateEvent | h.MessageUpdateEvent):
         """Updates the history with any changes or new messages in self.channel"""
-        try:
-            if not event.channel_id == self.channel.id:
-                return
+        retries = 12
+        for retry_no in range(retries):
+            try:
+                if not event.channel_id == self.channel.id:
+                    return
 
-            msg = event.message
+                if isinstance(event.message, h.Message):
+                    pass
+                elif isinstance(event.message, h.PartialMessage):
+                    msg = await self.bot.fetch_message(
+                        event.channel_id, event.message_id
+                    )
+                elif isinstance(event.message, h.Snowflakeish):
+                    msg = await self.bot.fetch_message(event.channel_id, event.message)
 
-            if not isinstance(msg, h.Message):
-                msg = await self.bot.fetch_message(event.channel_id, msg)
+                if not (self.limits[0] <= msg.timestamp <= self.limits[1]):
+                    return
 
-            if not (self.limits[0] <= msg.timestamp <= self.limits[1]):
-                return
+                # Get all messages in this event's message's period
+                from_ = self.round_down(msg.timestamp)
+                until_ = from_ + self.period
+                msgs_from_api = []
+                async for msg_from_api in self.channel.fetch_history(after=from_):
+                    if msg_from_api.timestamp > until_:
+                        break
+                    msgs_from_api.append(msg_from_api)
 
-            # Get all messages in this event's message's period
-            from_ = self.round_down(msg.timestamp)
-            until_ = from_ + self.period
-            msgs_from_api = []
-            async for msg_from_api in self.channel.fetch_history(after=from_):
-                if msg_from_api.timestamp > until_:
-                    break
-                msgs_from_api.append(msg_from_api)
+                self[from_] = self.preprocess_messages(msgs_from_api)
 
-            self[from_] = self.preprocess_messages(msgs_from_api)
-
-        except Exception as e:
-            await utils.discord_error_logger(self.bot, e)
+            except Exception as e:
+                await utils.discord_error_logger(self.bot, e)
+                await sleep(2**retry_no)
+            else:
+                break
 
     async def _update_lookahead(self):
         if self.lookahead_len <= 0:
