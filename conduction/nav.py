@@ -15,6 +15,7 @@
 
 # Define our custom navigator classes
 import datetime as dt
+import logging
 import typing as t
 from asyncio import sleep
 from random import randint
@@ -394,12 +395,19 @@ class NavPages(DateRangeDict):
 
     async def _update_history(self, event: h.MessageCreateEvent | h.MessageUpdateEvent):
         """Updates the history with any changes or new messages in self.channel"""
+
+        if not event.channel_id == self.channel.id:
+            return
+
+        logging.info(
+            ("Update " if isinstance(event, h.MessageUpdateEvent) else "Create ")
+            + f"event received in channel id {event.channel_id} "
+            + f"for message id {event.message_id}"
+        )
+
         retries = 12
         for retry_no in range(retries):
             try:
-                if not event.channel_id == self.channel.id:
-                    return
-
                 if isinstance(event.message, h.Message):
                     pass
                 elif isinstance(event.message, h.PartialMessage):
