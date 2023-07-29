@@ -31,9 +31,8 @@ FOLLOWABLE_CHANNEL = cfg.followables["xur"]
 
 
 class XurPages(NavPages):
-    @classmethod
     def preprocess_messages(
-        cls, messages: t.List[MessagePrototype | h.Message]
+        self, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
         # NOTE: This assumes that the xur message is sent with the
         # location gif as a link, not as an attachment

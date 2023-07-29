@@ -30,9 +30,8 @@ FOLLOWABLE_CHANNEL = cfg.followables["twab"]
 
 
 class TWIDPages(NavPages):
-    @classmethod
     def preprocess_messages(
-        cls, messages: t.List[MessagePrototype | h.Message]
+        self, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
         msg: MessagePrototype = utils.accumulate(
             [MessagePrototype.from_message(m) for m in messages]

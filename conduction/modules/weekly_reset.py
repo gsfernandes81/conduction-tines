@@ -30,9 +30,8 @@ FOLLOWABLE_CHANNEL = cfg.followables["weekly_reset"]
 
 
 class ResetPages(NavPages):
-    @classmethod
     def preprocess_messages(
-        cls, messages: t.List[MessagePrototype | h.Message]
+        self, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
         return (
             utils.accumulate([MessagePrototype.from_message(m) for m in messages])

@@ -241,8 +241,7 @@ async def format_sector(
 
 
 class SectorMessages(NavPages):
-    @classmethod
-    def preprocess_messages(cls, messages: t.List[h.Message | MessagePrototype]):
+    def preprocess_messages(self, messages: t.List[h.Message | MessagePrototype]):
         processed_messages = [
             MessagePrototype.from_message(m)
             .merge_content_into_embed(prepend=False)
