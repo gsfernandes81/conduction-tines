@@ -21,8 +21,9 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+import miru as m
 
-from . import schemas, utils, cfg
+from . import cfg, schemas, utils
 
 
 class CachedFetchBot(lb.BotApp):
@@ -267,7 +268,14 @@ class UserCommandBot(lb.BotApp):
                             await utils.follow_link_single_step(link)
                             for link in cfg.url_regex.findall(text)
                         ]
-                    )
+                    ),
+                    components=m.View().add_item(
+                        m.Button(
+                            style=h.ButtonStyle.LINK,
+                            url=cfg.user_command_button_url,
+                            label="See more on Kyber's Corner!",
+                        )
+                    ),
                 )
 
         elif cmd.response_type == 2:
