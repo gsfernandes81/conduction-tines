@@ -253,8 +253,6 @@ async def add_command(
                 await bot.sync_application_commands(session=session)
     except Exception as e:
         logging.exception(e)
-        if isinstance(e, utils.FriendlyValueError):
-            error_msg_if_applicable = "\n".join(e.args)
         await ctx.respond(
             "An error occured adding the `{}` commmand or group.\n".format(
                 " -> ".join(
