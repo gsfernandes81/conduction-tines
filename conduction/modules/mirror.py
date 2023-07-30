@@ -67,6 +67,19 @@ class KernelWorkDone:
     retries: int = attr.ib(default=0, converter=int)
 
 
+def _get_message_summary(msg: h.Message, default: str = "Link") -> str:
+    if msg.content:
+        return msg.content.split("\n")[0]
+
+    for embed in msg.embeds:
+        if embed.title:
+            return embed.title
+        if embed.description:
+            return msg.embeds[0].description.split("\n")[0]
+
+    return default
+
+
 async def log_mirror_progress_to_discord(
     bot: bot.CachedFetchBot,
     successes: int,
@@ -121,19 +134,7 @@ async def log_mirror_progress_to_discord(
                 )
                 if source_message:
                     source_guild = await bot.fetch_guild(source_channel.guild_id)
-
-                    source_message_summary = (
-                        source_message.content.split("\n")[0]
-                        if source_message.content
-                        else False
-                    ) or (
-                        (
-                            source_message.embeds[0].title
-                            or source_message.embeds[0].description.split()[0],
-                        )
-                        if source_message.embeds
-                        else "Link"
-                    )
+                    source_message_summary = _get_message_summary(source_message)
                     source_message_link = source_message.make_link(source_guild)
 
                 else:
