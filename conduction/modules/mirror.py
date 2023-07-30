@@ -205,9 +205,12 @@ async def log_mirror_progress_to_discord(
                 ):
                     embed.edit_field(PERCENTILE_TIME, h.UNDEFINED, str(time_taken))
 
+                if failures > 0:
+                    embed.color = cfg.embed_error_color
+
                 if is_completed:
                     embed.set_footer(
-                        text="✅ Completed",
+                        text="✅ Completed" + (" with errors" if failures > 0 else ""),
                     )
 
                 return await existing_message.edit(embeds=[embed])
@@ -371,7 +374,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                 len(mirrors),
                 msg,
                 mirror_start_time,
-                title="Mirror progress",
+                title="Mirror (send) progress",
             )
 
             successes = []
