@@ -166,7 +166,7 @@ class UserCommandBot(lb.BotApp):
 
         try:
             # Try to find the command group
-            command_group: lb.Command = self._slash_commands[ln_names[0]]._initialiser
+            command_group: lb.Command = self.slash_commands[ln_names[0]]._initialiser
         except KeyError:
             raise cmd_not_found_exc
 
@@ -233,7 +233,7 @@ class UserCommandBot(lb.BotApp):
                     if existing_cmd.name == cmd.ln_names[-1]:
                         cmd_group.subcommands.remove(existing_cmd)
             else:
-                self.remove_command(self._slash_commands.get(cmd.l1_name))
+                self.remove_command(self.slash_commands.get(cmd.l1_name))
 
         if cmd.is_subcommand_or_subgroup:
             register_command = self.get_command_group(*cmd.ln_names[:-1]).child
