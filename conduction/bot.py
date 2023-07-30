@@ -129,10 +129,12 @@ class UserCommandBot(lb.BotApp):
 
         Note: Does not differentiate between commands and command groups"""
 
+        # Filter out empty names
+        ln_names = list(filter(lambda x: x, ln_names))
         utils.check_number_of_layers(ln_names)
 
         # lb.BotApp._slash_commands is a dict of names to CommandLike instances
-        commands_group = self._slash_commands
+        commands_group = self.slash_commands
 
         for ln_name in ln_names:
             # Existing command will be None if no such command exists
@@ -189,7 +191,7 @@ class UserCommandBot(lb.BotApp):
 
         # Remove all commands and command groups that are schema based
         # Currently only deletes layer 1 commands and groups
-        for command in self.slash_commands:
+        for command in list(self.slash_commands.values()):
             if isinstance(command, SchemaBackedCommand):
                 self.remove_command(command)
 
