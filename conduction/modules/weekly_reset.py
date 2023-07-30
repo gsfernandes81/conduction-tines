@@ -18,6 +18,7 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+import regex as re
 from hmessage import HMessage as MessagePrototype
 
 from .. import cfg, utils
@@ -28,16 +29,27 @@ REFERENCE_DATE = dt.datetime(2023, 7, 18, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["weekly_reset"]
 
+# This regex finds the lines that start with
+# "From" or "Till"
+# These lines are intended to be removed in code
+rgx_find_from_till_text = re.compile(r"\n\*\*(From|Till)\*\*[^\n]*")
+
 
 class ResetPages(NavPages):
     def preprocess_messages(
         self, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
-        return (
+        msg_proto = (
             utils.accumulate([MessagePrototype.from_message(m) for m in messages])
             .merge_content_into_embed()
             .merge_attachements_into_embed()
         )
+
+        # Remove duplicate From/Till text from polarity embed
+        for embed in msg_proto.embeds:
+            embed.description = rgx_find_from_till_text.sub("", embed.description or "")
+
+        return msg_proto
 
 
 async def on_start(event: h.StartedEvent):

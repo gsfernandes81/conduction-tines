@@ -18,6 +18,7 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+import regex as re
 from hmessage import HMessage as MessagePrototype
 from hmessage import MultiImageEmbedList
 
@@ -28,6 +29,11 @@ from .autoposts import autopost_command_group, follow_control_command_maker
 REFERENCE_DATE = dt.datetime(2023, 7, 14, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["xur"]
+
+# This regex finds the lines that start with
+# "Arrives:" or "Departs:"
+# These lines are intended to be removed in code
+rgx_find_arrives_departs_text = re.compile(r"\n\*\*(Arrives|Departs):\*\*[^\n]*")
 
 
 class XurPages(NavPages):
@@ -52,6 +58,13 @@ class XurPages(NavPages):
         msg_proto.embeds = MultiImageEmbedList.from_embed(
             msg_proto.embeds[1]
         ).add_image(msg_proto.embeds[0].url)
+
+        # Remove duplicate Arrives/Departs text from polarity embed
+        for embed in msg_proto.embeds:
+            embed.description = rgx_find_arrives_departs_text.sub(
+                "", embed.description or ""
+            )
+
         return msg_proto
 
 
