@@ -18,6 +18,7 @@ import logging
 import lightbulb as lb
 
 from .. import cfg, schemas
+from ..bot import UserCommandBot
 
 # Get logger for module
 # & Set logging level to INFO
@@ -47,16 +48,18 @@ async def migrate_group(ctx: lb.Context):
     auto_defer=True,
 )
 @lb.implements(lb.SlashSubCommand)
-async def migrate_mirror(ctx: lb.Context, dry_run: bool = True):
+async def migrate_mirror(ctx: lb.Context, dry_run: str = True):
     bot: lb.BotApp = ctx.bot
 
     if ctx.author.id not in await bot.fetch_owner_ids():
         logger.error("Unauthorised user attempted to migrate mirrors")
         return
 
+    dry_run = dry_run.lower() != "false"
+
     async with schemas.db_session() as session:
         async with session.begin():
-            await ctx.respond("Migrating mirrors...")
+            await ctx.respond(f"Migrating mirrors... Dry run: {dry_run}")
 
             for schema, source_channel in [
                 (schemas.LostSectorAutopostChannel, cfg.ls_followable),
@@ -114,7 +117,7 @@ async def migrate_mirror(ctx: lb.Context, dry_run: bool = True):
 
 
 @migrate_group.child
-@lb.option("dry_run", description="Do not commit changes", default=True)
+@lb.option("dry_run", description="Do not commit changes", default="True")
 @lb.command(
     "cmds",
     description="Migrate mirror data from the old bot",
@@ -124,16 +127,18 @@ async def migrate_mirror(ctx: lb.Context, dry_run: bool = True):
     auto_defer=True,
 )
 @lb.implements(lb.SlashSubCommand)
-async def migrate_cmds(ctx: lb.Context, dry_run: bool = True):
-    bot: lb.BotApp = ctx.bot
+async def migrate_cmds(ctx: lb.Context, dry_run: str):
+    bot: UserCommandBot = ctx.bot
 
     if ctx.author.id not in await bot.fetch_owner_ids():
         logger.error("Unauthorised user attempted to migrate mirrors")
         return
 
+    dry_run = dry_run.lower() != "false"
+
     async with schemas.db_session() as session:
         async with session.begin():
-            await ctx.respond("Migrating commands...")
+            await ctx.respond(f"Migrating commands... Dry run: {dry_run}")
 
             for old_command in await schemas.OldUserCommand.get_all(session=session):
                 try:

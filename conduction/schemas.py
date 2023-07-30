@@ -50,6 +50,7 @@ db_session.configure(
             cfg.db_url_async,
             connect_args=cfg.db_connect_args,
             max_overflow=-1,
+            isolation_level="READ COMMITTED",
         ),
         OldBase: create_async_engine(
             cfg.legacy_db_url_async,
