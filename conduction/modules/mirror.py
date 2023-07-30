@@ -633,10 +633,13 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
                     job.source_message_id,
                     job.dest_channel_id,
                     job.retries + 1,
-                    # Wait for between 3 and 5 minutes before retrying
+                    # Wait for between 10 and 30 minutes before retrying
                     # to allow for momentary discord outages of particular
                     # servers
-                    delay=randint(180, 300),
+                    # This delay is longer than the ones for create and delete
+                    # since in case we hit an edit rate limit, it will be much
+                    # longer before we can retry generally
+                    delay=randint(600, 1800),
                 )
             )
             for job in to_retry
