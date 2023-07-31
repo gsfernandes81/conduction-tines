@@ -78,9 +78,6 @@ def follow_control_command_maker(
     ):
         option = bool(option)
         bot: t.Union[CachedFetchBot, UserCommandBot] = ctx.bot
-        # Defer the response manually, as auto defer is bugged for subcommands
-        await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-
         try:
             if not (
                 await utils.check_invoker_is_owner(ctx)

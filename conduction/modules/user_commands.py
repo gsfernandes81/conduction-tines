@@ -167,6 +167,7 @@ def schema_options(
     "Preview a command response prior to adding it",
     pass_options=True,
     inherit_checks=True,
+    auto_defer=True,
 )
 @lb.implements(lb.SlashSubCommand)
 async def preview_command(
@@ -174,9 +175,6 @@ async def preview_command(
     type: int,
     response: str,
 ):
-    # Manually defer
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
@@ -221,7 +219,9 @@ async def preview_command(
 @command_group.child
 @schema_options(type_needed=True, description_needed=True, command_groups_allowed=True)
 @layer_options(autocomplete=False)
-@lb.command("add", "Add a command", pass_options=True, inherit_checks=True)
+@lb.command(
+    "add", "Add a command", pass_options=True, inherit_checks=True, auto_defer=True
+)
 @lb.implements(lb.SlashSubCommand)
 async def add_command(
     ctx: lb.Context,
@@ -232,9 +232,6 @@ async def add_command(
     type: int,
     response: str,
 ):
-    # Manually defer
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
-
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
@@ -285,7 +282,13 @@ async def add_command(
     default=False,
 )
 @layer_options(autocomplete=True)
-@lb.command("delete", "Delete a command", pass_options=True, inherit_checks=True)
+@lb.command(
+    "delete",
+    "Delete a command",
+    pass_options=True,
+    inherit_checks=True,
+    auto_defer=True,
+)
 @lb.implements(lb.SlashSubCommand)
 async def delete_command(
     ctx: lb.Context,
@@ -294,8 +297,6 @@ async def delete_command(
     layer3: str,
     delete_whole_group: bool = False,
 ):
-    # Manually defer
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     bot: UserCommandBot = ctx.bot
 
     try:
@@ -349,7 +350,9 @@ async def delete_command(
 @command_group.child
 @schema_options(type_needed=False, description_needed=False)
 @layer_options(autocomplete=True)
-@lb.command("edit", "Edit a command", pass_options=True, inherit_checks=True)
+@lb.command(
+    "edit", "Edit a command", pass_options=True, inherit_checks=True, auto_defer=True
+)
 @lb.implements(lb.SlashSubCommand)
 async def edit_command(
     ctx: lb.Context,
@@ -360,8 +363,6 @@ async def edit_command(
     type: int,
     response: str,
 ):
-    # Manually defer
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     bot: UserCommandBot = ctx.bot
     type: int = int(type)
 
@@ -426,6 +427,7 @@ async def edit_command(
     "Rename a command or command group",
     pass_options=True,
     inherit_checks=True,
+    auto_defer=True,
 )
 @lb.implements(lb.SlashSubCommand)
 async def rename_command_or_group(
@@ -437,8 +439,6 @@ async def rename_command_or_group(
     layer2new: str,
     layer3new: str,
 ):
-    # Manually defer
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     bot: UserCommandBot = ctx.bot
 
     try:

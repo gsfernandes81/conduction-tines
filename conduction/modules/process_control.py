@@ -35,10 +35,10 @@ def process_control_command_group():
 @lb.command(
     "shutdown",
     "USE WITH CAUTION: Shuts down the bot! Cannot be restarted from discord!",
+    auto_defer=True,
 )
 @lb.implements(lb.SlashSubCommand)
 async def shutdown_command(ctx: lb.Context):
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     if not await utils.check_invoker_is_owner(ctx):
         await ctx.respond("Only a bot owner can use this command")
     else:
@@ -52,10 +52,9 @@ async def shutdown_command(ctx: lb.Context):
 
 
 @process_control_command_group.child
-@lb.command("restart", "Restarts the bot")
+@lb.command("restart", "Restarts the bot", auto_defer=True)
 @lb.implements(lb.SlashSubCommand)
 async def restart_command(ctx: lb.Context):
-    await ctx.respond(h.ResponseType.DEFERRED_MESSAGE_CREATE)
     if not await utils.check_invoker_is_owner(ctx):
         await ctx.respond("Only a bot owner can use this command")
     else:
