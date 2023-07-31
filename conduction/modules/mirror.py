@@ -298,216 +298,197 @@ async def message_create_repeater(event: h.MessageCreateEvent):
 
     mirror_start_time = perf_counter()
 
-    async with db_session() as session:
-        async with session.begin():
+    # Remove discord auto image embeds
+    msg.embeds = list(
+        filter(lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds)
+    )
 
-            async def kernel(
-                mirror_ch_id: int, current_retries: int = 0, delay: int = 0
-            ) -> KernelWorkDone:
-                await aio.sleep(delay)
+    async def kernel(
+        mirror_ch_id: int, current_retries: int = 0, delay: int = 0
+    ) -> KernelWorkDone:
+        await aio.sleep(delay)
 
+        try:
+            channel: h.TextableChannel = await bot.fetch_channel(mirror_ch_id)
+
+            if not isinstance(channel, h.TextableChannel):
+                # Ignore non textable channels
+                raise ValueError("Channel is not textable")
+
+            async with discord_api_semaphore:
+                # Send the message
+                mirrored_msg = await channel.send(
+                    msg.content,
+                    attachments=msg.attachments,
+                    components=msg.components,
+                    embeds=msg.embeds,
+                )
+        except Exception as e:
+            e.add_note(
+                f"Scheduling retry for message-send to channel {mirror_ch_id} "
+                + "due to exception\n"
+            )
+            logging.exception(e)
+            return KernelWorkDone(
+                source_message_id=msg.id,
+                dest_channel_id=mirror_ch_id,
+                exception=e,
+                retries=current_retries,
+            )
+
+        if isinstance(channel, h.GuildNewsChannel):
+            # If the channel is a news channel then crosspost the message as well
+            crosspost_backoff = 30
+            for _ in range(3):
                 try:
-                    channel: h.TextableChannel = await bot.fetch_channel(mirror_ch_id)
-
-                    if not isinstance(channel, h.TextableChannel):
-                        # Ignore non textable channels
-                        raise ValueError("Channel is not textable")
-
                     async with discord_api_semaphore:
-                        # Send the message
-                        mirrored_msg = await channel.send(
-                            msg.content,
-                            attachments=msg.attachments,
-                            components=msg.components,
-                            embeds=msg.embeds,
-                        )
+                        await bot.rest.crosspost_message(mirror_ch_id, mirrored_msg.id)
                 except Exception as e:
                     e.add_note(
-                        f"Scheduling retry for message-send to channel {mirror_ch_id} "
+                        f"Failed to crosspost message in channel {mirror_ch_id} "
                         + "due to exception\n"
                     )
                     logging.exception(e)
-                    return KernelWorkDone(
-                        source_message_id=msg.id,
-                        dest_channel_id=mirror_ch_id,
-                        exception=e,
-                        retries=current_retries,
-                    )
-
-                if isinstance(channel, h.GuildNewsChannel):
-                    # If the channel is a news channel then crosspost the message as well
-                    crosspost_backoff = 30
-                    for _ in range(3):
-                        try:
-                            async with discord_api_semaphore:
-                                await bot.rest.crosspost_message(
-                                    mirror_ch_id, mirrored_msg.id
-                                )
-                        except Exception as e:
-                            e.add_note(
-                                f"Failed to crosspost message in channel {mirror_ch_id} "
-                                + "due to exception\n"
-                            )
-                            logging.exception(e)
-                            await aio.sleep(crosspost_backoff)
-                            crosspost_backoff = crosspost_backoff * 2
-                        else:
-                            break
-
-                return KernelWorkDone(
-                    source_message_id=msg.id,
-                    dest_channel_id=mirror_ch_id,
-                    dest_message_id=mirrored_msg.id,
-                    retries=current_retries,
-                )
-
-            announce_jobs = [
-                aio.create_task(kernel(mirror_ch_id)) for mirror_ch_id in mirrors
-            ]
-            return_in = 10  # seconds
-            max_retries = 2
-            log_message: h.Message = await log_mirror_progress_to_discord(
-                bot,
-                0,
-                0,
-                0,
-                len(mirrors),
-                msg,
-                mirror_start_time,
-                title="Mirror (send) progress",
-            )
-
-            successes = []
-            failures = []
-            to_retry = []
-            pending = []
-
-            while True:
-                done, pending = await aio.wait(
-                    # announce_jobs is set then updated to only contain pending jobs
-                    announce_jobs,
-                    # Use the timeout to return in a fixed time to update logging and the db
-                    timeout=return_in,
-                    return_when=aio.ALL_COMPLETED,
-                )
-
-                # Successes and failures to log to db
-                failures_to_log = []
-                successes_to_log = []
-                # Empty the to_retry list
-                to_retry = []
-
-                for task in done:
-                    result = task.result()
-                    # If the result is an exception
-                    if result.exception:
-                        if result.retries < max_retries:
-                            # and if we have retries left
-                            # then we add it to the to_retry list
-                            to_retry.append(result)
-                        else:
-                            # if we have no retries left
-                            # then we add it to the failures list
-                            # for logging in the db
-                            failures_to_log.append(result)
-                    else:
-                        # If the result is not an exception
-                        # then we add it to the successes list
-                        # to be logged in the db
-                        successes_to_log.append(result)
-
-                # Log successes, failures and message pairs to the db
-                maybe_exceptions = await aio.gather(
-                    MirroredChannel.log_legacy_mirror_failure_in_batch(
-                        msg.channel_id,
-                        [failure.dest_channel_id for failure in failures_to_log],
-                        session=session,
-                    ),
-                    MirroredChannel.log_legacy_mirror_success_in_batch(
-                        msg.channel_id,
-                        [success.dest_channel_id for success in successes_to_log],
-                        session=session,
-                    ),
-                    MirroredMessage.add_msgs_in_batch(
-                        dest_msgs=[
-                            success.dest_message_id for success in successes_to_log
-                        ],
-                        dest_channels=[
-                            success.dest_channel_id for success in successes_to_log
-                        ],
-                        source_msg=msg.id,
-                        source_channel=msg.channel_id,
-                    ),
-                    return_exceptions=True,
-                )
-
-                # Log exceptions working with the db to the console
-                if any(maybe_exceptions):
-                    logging.error(
-                        "Error logging mirror success/failure in db: "
-                        + ", ".join(
-                            [
-                                str(exception)
-                                for exception in maybe_exceptions
-                                if exception
-                            ]
-                        )
-                    )
-
-                successes.extend(successes_to_log)
-                failures.extend(failures_to_log)
-
-                log_message = await log_mirror_progress_to_discord(
-                    bot,
-                    len(successes),
-                    len(to_retry),
-                    len(failures),
-                    len(pending),
-                    msg,
-                    mirror_start_time,
-                    existing_message=log_message,
-                    is_completed=not (bool(pending) or bool(to_retry)),
-                )
-
-                announce_jobs = pending | set(
-                    aio.create_task(
-                        kernel(
-                            job.dest_channel_id,
-                            job.retries + 1,
-                            # Wait for between 3 and 5 minutes before retrying
-                            # to allow for momentary discord outages of particular
-                            # servers
-                            delay=randint(180, 300),
-                        )
-                    )
-                    for job in to_retry
-                )
-
-                if len(announce_jobs) == 0:
+                    await aio.sleep(crosspost_backoff)
+                    crosspost_backoff = crosspost_backoff * 2
+                else:
                     break
 
-            logging.info(
-                "Completed all mirrors in " + str(perf_counter() - mirror_start_time)
+        return KernelWorkDone(
+            source_message_id=msg.id,
+            dest_channel_id=mirror_ch_id,
+            dest_message_id=mirrored_msg.id,
+            retries=current_retries,
+        )
+
+    announce_jobs = [aio.create_task(kernel(mirror_ch_id)) for mirror_ch_id in mirrors]
+    return_in = 10  # seconds
+    max_retries = 2
+    log_message: h.Message = await log_mirror_progress_to_discord(
+        bot,
+        0,
+        0,
+        0,
+        len(mirrors),
+        msg,
+        mirror_start_time,
+        title="Mirror (send) progress",
+    )
+
+    successes = []
+    failures = []
+    to_retry = []
+    pending = []
+
+    while True:
+        done, pending = await aio.wait(
+            # announce_jobs is set then updated to only contain pending jobs
+            announce_jobs,
+            # Use the timeout to return in a fixed time to update logging and the db
+            timeout=return_in,
+            return_when=aio.ALL_COMPLETED,
+        )
+
+        # Successes and failures to log to db
+        failures_to_log = []
+        successes_to_log = []
+        # Empty the to_retry list
+        to_retry = []
+
+        for task in done:
+            result = task.result()
+            # If the result is an exception
+            if result.exception:
+                if result.retries < max_retries:
+                    # and if we have retries left
+                    # then we add it to the to_retry list
+                    to_retry.append(result)
+                else:
+                    # if we have no retries left
+                    # then we add it to the failures list
+                    # for logging in the db
+                    failures_to_log.append(result)
+            else:
+                # If the result is not an exception
+                # then we add it to the successes list
+                # to be logged in the db
+                successes_to_log.append(result)
+
+        # Log successes, failures and message pairs to the db
+        maybe_exceptions = await aio.gather(
+            MirroredChannel.log_legacy_mirror_failure_in_batch(
+                msg.channel_id,
+                [failure.dest_channel_id for failure in failures_to_log],
+            ),
+            MirroredChannel.log_legacy_mirror_success_in_batch(
+                msg.channel_id,
+                [success.dest_channel_id for success in successes_to_log],
+            ),
+            MirroredMessage.add_msgs_in_batch(
+                dest_msgs=[success.dest_message_id for success in successes_to_log],
+                dest_channels=[success.dest_channel_id for success in successes_to_log],
+                source_msg=msg.id,
+                source_channel=msg.channel_id,
+            ),
+            return_exceptions=True,
+        )
+
+        # Log exceptions working with the db to the console
+        if any(maybe_exceptions):
+            logging.error(
+                "Error logging mirror success/failure in db: "
+                + ", ".join(
+                    [str(exception) for exception in maybe_exceptions if exception]
+                )
             )
 
-            # Auto disable persistently failing mirrors
-            if cfg.disable_bad_channels:
-                disabled_mirrors = await MirroredChannel.disable_legacy_failing_mirrors(
-                    session=session
-                )
+        successes.extend(successes_to_log)
+        failures.extend(failures_to_log)
 
-            if disabled_mirrors:
-                logging.warning(
-                    ("Disabled " if cfg.disable_bad_channels else "Would disable ")
-                    + str(len(disabled_mirrors))
-                    + " mirrors: "
-                    + ", ".join(
-                        [
-                            f"{mirror.src_id}: {mirror.dest_id}"
-                            for mirror in disabled_mirrors
-                        ]
-                    )
+        log_message = await log_mirror_progress_to_discord(
+            bot,
+            len(successes),
+            len(to_retry),
+            len(failures),
+            len(pending),
+            msg,
+            mirror_start_time,
+            existing_message=log_message,
+            is_completed=not (bool(pending) or bool(to_retry)),
+        )
+
+        announce_jobs = pending | set(
+            aio.create_task(
+                kernel(
+                    job.dest_channel_id,
+                    job.retries + 1,
+                    # Wait for between 3 and 5 minutes before retrying
+                    # to allow for momentary discord outages of particular
+                    # servers
+                    delay=randint(180, 300),
                 )
+            )
+            for job in to_retry
+        )
+
+        if len(announce_jobs) == 0:
+            break
+
+    logging.info("Completed all mirrors in " + str(perf_counter() - mirror_start_time))
+
+    # Auto disable persistently failing mirrors
+    if cfg.disable_bad_channels:
+        disabled_mirrors = await MirroredChannel.disable_legacy_failing_mirrors()
+
+    if disabled_mirrors:
+        logging.warning(
+            ("Disabled " if cfg.disable_bad_channels else "Would disable ")
+            + str(len(disabled_mirrors))
+            + " mirrors: "
+            + ", ".join(
+                [f"{mirror.src_id}: {mirror.dest_id}" for mirror in disabled_mirrors]
+            )
+        )
 
 
 @ignore_non_kyber_servers
@@ -536,6 +517,11 @@ async def message_update_repeater(event: h.MessageUpdateEvent):
             break
 
     mirror_start_time = perf_counter()
+
+    # Remove discord auto image embeds
+    msg.embeds = list(
+        filter(lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds)
+    )
 
     async def kernel(
         msg_id: int, channel_id: int, current_retries: Optional[int] = 0, delay: int = 0
