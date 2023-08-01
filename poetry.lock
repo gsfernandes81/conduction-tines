@@ -1128,8 +1128,8 @@ yarl = "^1.9.2"
 [package.source]
 type = "git"
 url = "https://github.com/gs729/hikari-message.git"
-reference = "55e9b2d"
-resolved_reference = "55e9b2d8dd94ef44f48121c305329fc9aff63484"
+reference = "8bf2908"
+resolved_reference = "8bf2908bbbe19d2663ee942ffbe2fd95758166c2"
 
 [[package]]
 name = "hikari-miru"
@@ -1899,14 +1899,14 @@ rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
 
 [[package]]
 name = "rich"
-version = "13.5.1"
+version = "13.5.2"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 category = "dev"
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "rich-13.5.1-py3-none-any.whl", hash = "sha256:b97381b204a206e1be618f5e1215a57174a1a7732490b3bf6668cf41d30bc72d"},
-    {file = "rich-13.5.1.tar.gz", hash = "sha256:881653ee7037803559d8eae98f145e0a4c4b0ec3ff0300d2cc8d479c71fc6819"},
+    {file = "rich-13.5.2-py3-none-any.whl", hash = "sha256:146a90b3b6b47cac4a73c12866a499e9817426423f57c5a66949c086191a8808"},
+    {file = "rich-13.5.2.tar.gz", hash = "sha256:fb9d6c0a0f643c99eed3875b5377a184132ba9be4d61516a55273d3554d75a39"},
 ]
 
 [package.dependencies]
@@ -1915,6 +1915,18 @@ pygments = ">=2.13.0,<3.0.0"
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
+
+[[package]]
+name = "roman"
+version = "4.1"
+description = "Integer to Roman numerals converter"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "roman-4.1-py3-none-any.whl", hash = "sha256:f131fd5eee3510f6173b825404eb97875a6c1925f73a2d7d48cfc67823a67c3c"},
+    {file = "roman-4.1.tar.gz", hash = "sha256:4da8a200529a730822a27f1704b3ac70bc907141d3bc558115fb8e36af13b412"},
+]
 
 [[package]]
 name = "rope"
@@ -2297,4 +2309,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.1"
-content-hash = "754fa32a74878ad617b59c763cb42338cb16d75c43d410f043a665a7de3e53e5"
+content-hash = "f6a937ff2f4e3a912fe5c13038973eeb66ece9077aa7478b1b7d75a4b3d824b8"
