@@ -51,6 +51,8 @@ db_session.configure(
             connect_args=cfg.db_connect_args,
             max_overflow=-1,
             isolation_level="READ COMMITTED",
+            pool_pre_ping=True,
+            pool_recycle=3600,
         ),
         OldBase: create_async_engine(
             cfg.legacy_db_url_async,
