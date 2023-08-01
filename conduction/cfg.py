@@ -119,7 +119,7 @@ embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
 embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
 emoji = json.loads(_getenv("EMOJI"))
 followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
-user_command_button_url = _getenv("USER_COMMAND_BUTTON_URL")
+default_url = _getenv("DEFAULT_URL")
 
 # Database URLs
 db_url, db_url_async = _db_urls("MYSQL_URL")

@@ -42,7 +42,7 @@ class ResetPages(NavPages):
         msg_proto = (
             utils.accumulate([MessagePrototype.from_message(m) for m in messages])
             .merge_content_into_embed()
-            .merge_attachements_into_embed()
+            .merge_attachements_into_embed(default_url=cfg.default_url)
         )
 
         # Remove duplicate From/Till text from polarity embed

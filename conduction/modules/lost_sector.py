@@ -245,7 +245,7 @@ class SectorMessages(NavPages):
         processed_messages = [
             MessagePrototype.from_message(m)
             .merge_content_into_embed(prepend=False)
-            .merge_attachements_into_embed()
+            .merge_attachements_into_embed(default_url=cfg.default_url)
             for m in messages
         ]
 

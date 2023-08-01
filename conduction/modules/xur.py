@@ -53,7 +53,7 @@ class XurPages(NavPages):
                 ]
             )
             .merge_content_into_embed(1)
-            .merge_attachements_into_embed()
+            .merge_attachements_into_embed(default_url=cfg.default_url)
         )
         msg_proto.embeds = MultiImageEmbedList.from_embed(
             msg_proto.embeds[1]
