@@ -32,7 +32,7 @@ end_user_allowed_perms = (
     h.Permissions.ADMINISTRATOR,
 )
 
-autopost_command_group = lb.command(name="autoposts", description="Autopost control")(
+autopost_command_group = lb.command(name="autopost", description="Autopost control")(
     lb.implements(lb.SlashCommandGroup)(lambda: None)
 )
 
