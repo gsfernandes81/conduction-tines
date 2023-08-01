@@ -39,6 +39,7 @@ NOTE_ABOUT_SLOW_DISCORD_PROPAGATION = (
     "Custom command control",
     guilds=(cfg.control_discord_server_id,),
     inherit_checks=True,
+    hidden=True,
 )
 @lb.implements(lb.SlashCommandGroup)
 def command_group(ctx: lb.Context):

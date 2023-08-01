@@ -22,7 +22,7 @@ from .. import cfg
 from ..bot import CachedFetchBot
 from ..schemas import MirroredChannel
 
-debug_group = lb.command(name="debug", description="Debug group")(
+debug_group = lb.command(name="debug", description="Debug group", hidden=True)(
     lb.implements(lb.SlashCommandGroup)(lambda: None)
 )
 

@@ -25,6 +25,7 @@ from .. import cfg, utils
     "process_control",
     "Shutdown and restart commands",
     guilds=[cfg.control_discord_server_id],
+    hidden=True,
 )
 @lb.implements(lb.SlashCommandGroup)
 def process_control_command_group():

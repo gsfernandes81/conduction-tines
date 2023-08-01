@@ -844,6 +844,7 @@ mirror_group = lb.command(
     "mirror",
     description="Command group for all mirror control/administration commands",
     guilds=[cfg.control_discord_server_id],
+    hidden=True,
 )(
     lb.implements(
         lb.SlashCommandGroup,
