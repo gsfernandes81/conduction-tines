@@ -22,6 +22,7 @@ import typing as t
 import hikari as h
 import lightbulb as lb
 import miru as m
+from yarl import URL
 
 from . import cfg, schemas, utils
 
@@ -285,7 +286,7 @@ class UserCommandBot(lb.BotApp):
             @decorator
             async def _responder(ctx: lb.Context):
                 msg_to_respond_with = await ctx.bot.rest.fetch_message(
-                    *[int(id_) for id_ in cmd.response_data.split(":")]
+                    *(URL(str(cmd.response_data)).path.split("/")[-2:])
                 )
                 await ctx.respond(
                     msg_to_respond_with.content,
