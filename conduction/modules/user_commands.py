@@ -26,6 +26,8 @@ from ..bot import UserCommandBot
 # TODO
 # Add a way to try a command response
 
+EMBEDS_FEATURE_FLAG = False
+
 NOTE_ABOUT_SLOW_DISCORD_PROPAGATION = (
     "\nNote:\n"
     + "Discord propagates command changes slowly so it may take a few minutes for "
@@ -117,12 +119,20 @@ def schema_options(
     """Decorator to add non layer schema options to commands"""
 
     def decorator_actual(func):
-        choices = [
-            h.CommandChoice(name="No Change", value=-1),
-            h.CommandChoice(name="Text", value=1),
-            h.CommandChoice(name="Message Copy", value=2),
-            h.CommandChoice(name="Embed", value=3),
-        ]
+        if EMBEDS_FEATURE_FLAG:
+            choices = [
+                h.CommandChoice(name="No Change", value=-1),
+                h.CommandChoice(name="Text", value=1),
+                h.CommandChoice(name="Message Copy", value=2),
+                h.CommandChoice(name="Embed", value=3),
+            ]
+        else:
+            choices = [
+                h.CommandChoice(name="No Change", value=-1),
+                h.CommandChoice(name="Text", value=1),
+                h.CommandChoice(name="Message Copy", value=2),
+            ]
+
         if command_groups_allowed:
             choices.append(h.CommandChoice(name="Command Group", value=0))
         if type_needed:
