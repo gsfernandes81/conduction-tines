@@ -38,6 +38,7 @@ def _lightbulb_params() -> dict:
     lightbulb_params = {
         "token": discord_token,
         "intents": intents,
+        "max_rate_limit": 600,
     }
     # Only use the test env for testing if it is specified
     if test_env:
