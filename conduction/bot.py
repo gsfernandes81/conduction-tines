@@ -274,7 +274,7 @@ class UserCommandBot(lb.BotApp):
                     components=m.View().add_item(
                         m.Button(
                             style=h.ButtonStyle.LINK,
-                            url=cfg.user_command_button_url,
+                            url=cfg.default_url,
                             label="See more on Kyber's Corner!",
                         )
                     ),
