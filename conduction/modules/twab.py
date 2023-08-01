@@ -95,8 +95,16 @@ async def twid(ctx: lb.Context):
     await navigator.send(ctx.interaction)
 
 
+@lb.command("twab", "Find out about This Week In Destinty (formerly the TWAB)")
+@lb.implements(lb.SlashCommand)
+async def twab(ctx: lb.Context):
+    navigator = NavigatorView(pages=evweekly, timeout=60, autodefer=True)
+    await navigator.send(ctx.interaction)
+
+
 def register(bot):
     bot.command(twid)
+    bot.command(twab)
     bot.listen()(on_start)
 
     autopost_command_group.child(
