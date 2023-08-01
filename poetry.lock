@@ -1899,14 +1899,14 @@ rsa = ["oauthlib[signedtoken] (>=3.0.0)"]
 
 [[package]]
 name = "rich"
-version = "13.5.0"
+version = "13.5.1"
 description = "Render rich text, tables, progress bars, syntax highlighting, markdown and more to the terminal"
 category = "dev"
 optional = false
 python-versions = ">=3.7.0"
 files = [
-    {file = "rich-13.5.0-py3-none-any.whl", hash = "sha256:996670a7618ccce27c55ba6fc0142e6e343773e11d34c96566a17b71b0e6f179"},
-    {file = "rich-13.5.0.tar.gz", hash = "sha256:62c81e88dc078d2372858660e3d5566746870133e51321f852ccc20af5c7e7b2"},
+    {file = "rich-13.5.1-py3-none-any.whl", hash = "sha256:b97381b204a206e1be618f5e1215a57174a1a7732490b3bf6668cf41d30bc72d"},
+    {file = "rich-13.5.1.tar.gz", hash = "sha256:881653ee7037803559d8eae98f145e0a4c4b0ec3ff0300d2cc8d479c71fc6819"},
 ]
 
 [package.dependencies]
@@ -1963,14 +1963,14 @@ develop = false
 
 [package.dependencies]
 attrs = ">=22.2.0"
-gspread = "*"
+gspread = "^5.9"
 pytz = "*"
 
 [package.source]
 type = "git"
 url = "https://github.com/gs729/sector_accounting.git"
-reference = "ae0dcc9"
-resolved_reference = "ae0dcc987833de4301d0583590c986ade75b9481"
+reference = "7b5d567"
+resolved_reference = "7b5d5677a7193016f9a8dd4f2538ab370b73c26e"
 
 [[package]]
 name = "six"
@@ -2297,4 +2297,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "~3.11.1"
-content-hash = "9278bda95ba40dff7775e8e361709fffe016fd1e2acded47c56c934405351726"
+content-hash = "754fa32a74878ad617b59c763cb42338cb16d75c43d410f043a665a7de3e53e5"
