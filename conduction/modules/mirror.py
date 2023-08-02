@@ -793,15 +793,24 @@ async def refresh_server_sizes(bot: bot.CachedFetchBot):
             )
             new_servers = list(set(server_populations.keys()) - set(existing_servers))
 
-            await ServerStatistics.add_servers_in_batch(
-                new_servers,
-                [server_populations[server_id] for server_id in new_servers],
-            )
+            new_servers_bins = [
+                new_servers[i : i + 50] for i in range(0, len(new_servers), 50)
+            ]
+            for new_servers_bin in new_servers_bins:
+                await ServerStatistics.add_servers_in_batch(
+                    new_servers_bin,
+                    [server_populations[server_id] for server_id in new_servers],
+                )
 
-            await ServerStatistics.update_population_in_batch(
-                existing_servers,
-                [server_populations[server_id] for server_id in existing_servers],
-            )
+            existing_servers_bins = [
+                existing_servers[i : i + 50]
+                for i in range(0, len(existing_servers), 50)
+            ]
+            for existing_servers_bin in existing_servers_bins:
+                await ServerStatistics.update_population_in_batch(
+                    existing_servers_bin,
+                    [server_populations[server_id] for server_id in existing_servers],
+                )
 
             MirroredChannel.reset_dests_cache()
         except Exception as e:
