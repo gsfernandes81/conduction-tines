@@ -21,18 +21,23 @@ import miru
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, modules, schemas, utils
-from .bot import CachedFetchBot, UserCommandBot
+from . import cfg, modules, schemas, help
+from .bot import CachedFetchBot, UserCommandBot, CustomHelpBot
 
 
-class Bot(UserCommandBot, CachedFetchBot):
+class Bot(UserCommandBot, CachedFetchBot, CustomHelpBot):
     pass
 
 
 uvloop.install()
 
 
-bot = Bot(**cfg.lightbulb_params, user_command_schema=schemas.UserCommand)
+bot = Bot(
+    **cfg.lightbulb_params,
+    user_command_schema=schemas.UserCommand,
+    help_class=help.HelpCommand,
+    help_slash_command=True,
+)
 
 
 async def update_status(guild_count: int):

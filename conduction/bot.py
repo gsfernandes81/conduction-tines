@@ -315,3 +315,111 @@ class UserCommandBot(lb.BotApp):
                 await ctx.respond(embed)
 
         return _responder
+
+
+async def command_name_autocomplete(
+    option: h.AutocompleteInteractionOption,
+    interaction: h.AutocompleteInteraction,
+) -> t.List[h.CommandOption] | None:
+    bot: lb.BotApp = interaction.app
+    include_hidden = interaction.guild_id == cfg.control_discord_server_id
+    value = option.value
+
+    command_list: t.List[lb.Command] = [
+        *bot.slash_commands.values(),
+    ]
+
+    autocompletions = []
+    for command in command_list:
+        if command.name.startswith(value) and (include_hidden or not command.hidden):
+            autocompletions.append(command.name)
+
+    return autocompletions[:7]
+
+
+class CustomHelpBot(lb.BotApp):
+    def __init__(
+        self,
+        token: str,
+        prefix: t.Optional[lb.app.PrefixT] = None,
+        ignore_bots: bool = True,
+        owner_ids: t.Sequence[int] = (),
+        default_enabled_guilds: t.Union[int, t.Sequence[int]] = (),
+        help_class: t.Optional[t.Type[lb.help_command.BaseHelpCommand]] = None,
+        help_slash_command: bool = False,
+        delete_unbound_commands: bool = True,
+        case_insensitive_prefix_commands: bool = False,
+        **kwargs: t.Any,
+    ):
+        super().__init__(
+            token,
+            prefix,
+            ignore_bots,
+            owner_ids,
+            default_enabled_guilds,
+            None,
+            help_slash_command,
+            delete_unbound_commands,
+            case_insensitive_prefix_commands,
+            **kwargs,
+        )
+        if help_class is not None:
+            help_cmd_types: t.List[t.Type[lb.commands.base.Command]] = []
+
+            if prefix is not None:
+                help_cmd_types.append(lb.commands.prefix.PrefixCommand)
+
+            if help_slash_command:
+                help_cmd_types.append(lb.commands.slash.SlashCommand)
+
+            if help_cmd_types:
+                self._help_command = help_class(self)
+
+                self._setup_help_command(help_cmd_types)
+
+    def _setup_help_command(self, help_cmd_types: list) -> None:
+        @lb.option(
+            "obj",
+            "Object to get help for",
+            required=False,
+            modifier=lb.commands.base.OptionModifier.CONSUME_REST,
+            autocomplete=command_name_autocomplete,
+        )
+        @lb.command("help", "Get help information for the bot", auto_defer=False)
+        @lb.implements(*help_cmd_types)
+        async def __default_help(ctx: lb.Context) -> None:
+            assert self._help_command is not None
+            await self._help_command.send_help(ctx, ctx.options.obj)
+
+        self.command(__default_help)
+
+    def get_command_map(self) -> t.Dict[str, lb.SlashCommand | lb.SlashGroupMixin]:
+        """Get a dict of command names to command objects
+
+        Note: Does not differentiate between commands and command groups"""
+
+        # Notes:
+        # lb.SlashCommand & lb.SlashCommandGroups have the following attributes:
+        #  - name: str
+        #  - description: str
+        #  - hidden: bool
+        #  - subcommands: t.MutableMapping[str, lb.SlashCommand | lb.SlashGroupMixin]
+        #  - help_getter: t.Optional[t.Callable[[], str]]
+
+        command_map = {}
+
+        # lb.BotApp._slash_commands is a dict of names to CommandLike instances
+        commands_group = self.slash_commands
+
+        for command_name, command in commands_group.items():
+            command_map[command_name] = command
+            if isinstance(command, lb.SlashGroupMixin):
+                # If existing_command is a command group then check if the next
+                # ln_name exists in it in the next cycle
+                # If it is not then make commands_group an empty dict
+                # when we try and check if a command exists here in the next cycle
+                # this will return false, and if no next cycle occurs because we checked
+                # all ln_names already, this will return true
+                commands_group = command.subcommands
+
+        return command_map

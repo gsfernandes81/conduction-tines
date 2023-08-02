@@ -25,6 +25,7 @@ sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev
 sqlalchemy = "^2.0.1"
 uvloop = "^0.17.0"
 yarl = "^1.8.2"
+roman = "^4.1"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"
