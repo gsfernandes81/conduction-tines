@@ -25,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 def _test_env(var_name: str) -> list[int] | bool:
     test_env = _getenv(var_name) or "false"
+    test_env = test_env.lower()
     test_env = (
         [int(env.strip()) for env in test_env.split(",")]
         if test_env != "false"
