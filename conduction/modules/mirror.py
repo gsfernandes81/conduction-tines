@@ -299,9 +299,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
     mirror_start_time = perf_counter()
 
     # Remove discord auto image embeds
-    msg.embeds = list(
-        filter(lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds)
-    )
+    msg.embeds = utils.filter_discord_autoembeds(msg)
 
     async def kernel(
         mirror_ch_id: int, current_retries: int = 0, delay: int = 0
@@ -360,6 +358,9 @@ async def message_create_repeater(event: h.MessageCreateEvent):
             dest_message_id=mirrored_msg.id,
             retries=current_retries,
         )
+
+    # Always guard against infinite loops through posting to the source channel
+    mirrors = list(filter(lambda x: x != msg.channel_id, mirrors))
 
     announce_jobs = [aio.create_task(kernel(mirror_ch_id)) for mirror_ch_id in mirrors]
     return_in = 10  # seconds

@@ -25,6 +25,7 @@ import aiohttp
 import hikari as h
 import lightbulb as lb
 from toolbox.members import calculate_permissions
+from hmessage import HMessage as MessagePrototype
 
 from . import cfg
 
@@ -208,6 +209,24 @@ async def wait_till_lightbulb_started(bot: lb.BotApp):
     if not bot.d.has_lb_started:
         await bot.wait_for(lb.LightbulbStartedEvent, timeout=None)
         bot.d.has_lightbulb_started = True
+
+
+def filter_discord_autoembeds(msg: h.Message | MessagePrototype):
+    content = msg.content or ""
+    filtered_embeds = []
+    for embed in msg.embeds:
+        embed: h.Embed
+        embed_url = embed.url or ""
+        if (
+            embed_url not in content
+            and not embed.title
+            and not embed.description
+            and not embed.fields
+            and not embed.footer
+            and not embed.author
+        ):
+            filtered_embeds.append(embed)
+    return filtered_embeds
 
 
 class space:
