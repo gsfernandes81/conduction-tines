@@ -38,73 +38,61 @@ async def migrate_group(ctx: lb.Context):
 
 
 @migrate_group.child
-@lb.option("dry_run", description="Do not commit changes", default=True)
 @lb.command(
     "mirrors",
     description="Migrate mirror data from the old bot",
     hidden=True,
-    pass_options=True,
     guilds=[cfg.control_discord_server_id],
     auto_defer=True,
 )
 @lb.implements(lb.SlashSubCommand)
-async def migrate_mirror(ctx: lb.Context, dry_run: str = True):
+async def migrate_mirror(ctx: lb.Context):
     bot: lb.BotApp = ctx.bot
 
     if ctx.author.id not in await bot.fetch_owner_ids():
         logger.error("Unauthorised user attempted to migrate mirrors")
         return
 
-    dry_run = dry_run.lower() != "false"
+    await ctx.respond(f"Migrating mirrors...")
 
-    async with schemas.db_session() as session:
-        async with session.begin():
-            await ctx.respond(f"Migrating mirrors... Dry run: {dry_run}")
+    for schema, source_channel in [
+        (schemas.LostSectorAutopostChannel, cfg.ls_followable),
+        (schemas.XurAutopostChannel, cfg.xur_followable),
+        (schemas.WeeklyResetAutopostChannel, cfg.reset_followable),
+    ]:
+        logger.info(f"Migrating {schema.__name__}")
 
-            for schema, source_channel in [
-                (schemas.LostSectorAutopostChannel, cfg.ls_followable),
-                (schemas.XurAutopostChannel, cfg.xur_followable),
-                (schemas.WeeklyResetAutopostChannel, cfg.reset_followable),
-            ]:
-                logger.info(f"Migrating {schema.__name__}")
+        channels = await schema.get_channels()
+        logger.info(f"Got {len(channels)} channels")
+        logger.info(
+            "MirroredChannel initially has "
+            f"{await schemas.MirroredChannel.count_dests(source_channel)}"
+            " total mirrors and "
+            f"{await schemas.MirroredChannel.count_dests(source_channel, legacy_only=True)}"
+            f" legacy mirrors of {source_channel}"
+        )
+        for channel in channels:
+            await schemas.MirroredChannel.add_mirror(
+                source_channel,
+                channel.id,
+                None,
+                legacy=True,
+            )
 
-                channels = await schema.get_channels(session=session)
-                logger.info(f"Got {len(channels)} channels")
-                logger.info(
-                    "MirroredChannel initially has "
-                    f"{await schemas.MirroredChannel.count_dests(source_channel, session=session)}"
-                    " total mirrors and "
-                    f"{await schemas.MirroredChannel.count_dests(source_channel, legacy_only=True, session=session)}"
-                    f" legacy mirrors of {source_channel}"
-                )
-                for channel in channels:
-                    await schemas.MirroredChannel.add_mirror(
-                        source_channel,
-                        channel.id,
-                        None,
-                        legacy=True,
-                        session=session,
-                    )
+        logger.info(
+            "MirroredChannel now has "
+            f"{await schemas.MirroredChannel.count_dests(source_channel)}"
+            " total mirrors and "
+            f"{await schemas.MirroredChannel.count_dests(source_channel, legacy_only=True)}"
+            f" legacy mirrors of {source_channel}"
+        )
 
-                logger.info(
-                    "MirroredChannel now has "
-                    f"{await schemas.MirroredChannel.count_dests(source_channel, session=session)}"
-                    " total mirrors and "
-                    f"{await schemas.MirroredChannel.count_dests(source_channel, legacy_only=True, session=session)}"
-                    f" legacy mirrors of {source_channel}"
-                )
-
-            if dry_run:
-                await session.rollback()
-                await ctx.edit_last_response("Dry run complete, rolled back")
-                logger.info("Dry run complete, rolled back")
-            else:
-                await ctx.edit_last_response("Committing changes")
-                logger.info("Committing changes")
+        await ctx.edit_last_response("Committed changes")
+        logger.info("Committed changes")
 
     completion_message = "\n".join(
         [
-            "Changes commited" if not dry_run else "Dry run complete, rolled back",
+            "Changes commited",
             "MirroredChannel now has "
             + str(await schemas.MirroredChannel.count_total_dests())
             + " total mirrors and "
