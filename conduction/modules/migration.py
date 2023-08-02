@@ -13,12 +13,14 @@
 # You should have received a copy of the GNU Affero General Public License along with
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
+import asyncio as aio
 import logging
+import typing as t
 
 import lightbulb as lb
 
 from .. import cfg, schemas
-from ..bot import UserCommandBot
+from ..bot import CachedFetchBot, UserCommandBot
 
 # Get logger for module
 # & Set logging level to INFO
@@ -165,6 +167,93 @@ async def migrate_cmds(ctx: lb.Context, dry_run: str):
     )
 
     await ctx.edit_last_response(completion_message)
+
+
+@migrate_group.child
+@lb.command(
+    "pull_server_data",
+    description="Pull server data from the api",
+    hidden=True,
+    guilds=[cfg.control_discord_server_id],
+    auto_defer=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def pull_server_data(ctx: lb.Context):
+    bot: t.Union[UserCommandBot, CachedFetchBot] = ctx.bot
+
+    if ctx.author.id not in await bot.fetch_owner_ids():
+        logger.error("Unauthorised user attempted to migrate mirrors")
+        return
+
+    async with schemas.db_session() as session:
+        session: schemas.AsyncSession
+
+        async def get_dests_with_no_server_id(session_):
+            dests = await session_.execute(
+                schemas.select(schemas.MirroredChannel.dest_id).where(
+                    schemas.and_(
+                        (schemas.MirroredChannel.legacy == True),
+                        (schemas.MirroredChannel.enabled == True),
+                        (schemas.MirroredChannel.dest_server_id == None),
+                    )
+                )
+            )
+
+            dests = dests if dests else []
+            dests = [dest[0] for dest in dests]
+            return dests
+
+        dests = await get_dests_with_no_server_id(session)
+
+    await ctx.respond("Pulling server data for " + str(len(dests)) + " channels...")
+
+    completed_servers = []
+    completed_dests = []
+    for dest_id in dests:
+        try:
+            channel = await bot.fetch_channel(dest_id)
+            guild_id = channel.guild_id
+            guild = channel.get_guild() or await channel.fetch_guild()
+            if not guild.member_count:
+                raise ValueError(f"No member count for guild {guild_id}")
+        except Exception as e:
+            e.add_note(f"Failed to fetch data for channel {dest_id}")
+            logger.exception(e)
+            await aio.sleep(3)
+
+        else:
+            async with schemas.db_session() as session:
+                session: schemas.AsyncSession
+                async with session.begin():
+                    src_ids = await schemas.MirroredChannel.fetch_srcs(
+                        dest_id, session=session
+                    )
+
+                    for src_id in src_ids:
+                        mirror = await session.get(
+                            schemas.MirroredChannel, (src_id, dest_id)
+                        )
+                        await mirror.add_mirror(
+                            src_id=mirror.src_id,
+                            dest_id=mirror.dest_id,
+                            dest_server_id=guild_id,
+                            legacy=mirror.legacy,
+                            enabled=mirror.enabled,
+                            session=session,
+                        )
+                    await schemas.ServerStatistics.add_server(
+                        guild_id, guild.member_count, session=session
+                    )
+                    completed_servers.append(guild_id)
+            await aio.sleep(1)
+        finally:
+            completed_dests.append(dest_id)
+
+    async with schemas.db_session() as session:
+        await ctx.respond(
+            "Server data pulled. Remaining incomplete no of dests: "
+            + str(len(await get_dests_with_no_server_id(session)))
+        )
 
 
 def register(bot: lb.BotApp):
