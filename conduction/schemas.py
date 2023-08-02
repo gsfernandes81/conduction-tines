@@ -101,7 +101,7 @@ class MirroredChannel(Base):
         super().__init__()
         self.src_id = int(src_id)
         self.dest_id = int(dest_id)
-        self.dest_server_id = int(dest_server_id)
+        self.dest_server_id = dest_server_id and int(dest_server_id)
         self.legacy = bool(legacy)
         self.enabled = bool(enabled)
 
