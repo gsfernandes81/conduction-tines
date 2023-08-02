@@ -89,10 +89,13 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
             (key + tolerance - self.limits[0]) // self.period
         ) * self.period + self.limits[0]
 
-    def index_to_date(self, index: int) -> dt.datetime:
+    def index_to_date(
+        self, index: int, tolerance: t.Optional[dt.timedelta] = reset_time_tolerance
+    ) -> dt.datetime:
         """Return the datetime of the period at <index>"""
         return (
-            self.round_down(dt.datetime.now(tz=dt.timezone.utc)) + index * self.period
+            self.round_down(dt.datetime.now(tz=dt.timezone.utc), tolerance=tolerance)
+            + index * self.period
         )
 
     def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
@@ -448,7 +451,11 @@ class NavPages(DateRangeDict):
         if self.lookahead_len <= 0:
             return
 
-        self.update(await self.lookahead(self.index_to_date(1)))
+        self.update(
+            await self.lookahead(
+                self.index_to_date(1, tolerance=dt.timedelta(minutes=1))
+            )
+        )
 
     def _setup_autoupdate(self):
         if self.history_len > 0:
