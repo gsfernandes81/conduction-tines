@@ -78,8 +78,8 @@ class TWIDPages(NavPages):
 
 
 async def on_start(event: h.StartedEvent):
-    global evweekly
-    evweekly = await TWIDPages.from_channel(
+    global twidpages
+    twidpages = await TWIDPages.from_channel(
         event.app,
         FOLLOWABLE_CHANNEL,
         history_len=4,
@@ -91,14 +91,14 @@ async def on_start(event: h.StartedEvent):
 @lb.command("twid", "Find out about This Week In Destinty (formerly the TWAB)")
 @lb.implements(lb.SlashCommand)
 async def twid(ctx: lb.Context):
-    navigator = NavigatorView(pages=evweekly, timeout=60, autodefer=True)
+    navigator = NavigatorView(pages=twidpages, timeout=60, autodefer=True)
     await navigator.send(ctx.interaction)
 
 
 @lb.command("twab", "Find out about This Week In Destinty (formerly the TWAB)")
 @lb.implements(lb.SlashCommand)
 async def twab(ctx: lb.Context):
-    navigator = NavigatorView(pages=evweekly, timeout=60, autodefer=True)
+    navigator = NavigatorView(pages=twidpages, timeout=60, autodefer=True)
     await navigator.send(ctx.interaction)
 
 
