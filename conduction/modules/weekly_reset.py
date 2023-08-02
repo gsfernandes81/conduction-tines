@@ -73,7 +73,7 @@ async def weekly_reset_command_group(ctx: lb.Context):
 @lb.command("reset", "Find out about this weeks reset")
 @lb.implements(lb.SlashSubCommand)
 async def weekly_reset_command(ctx: lb.Context):
-    navigator = NavigatorView(pages=reset_pages, timeout=60)
+    navigator = NavigatorView(pages=reset_pages)
     await navigator.send(ctx.interaction)
 
 

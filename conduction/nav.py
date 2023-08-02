@@ -29,7 +29,7 @@ from miru.ext import nav
 
 from . import utils
 from .bot import CachedFetchBot
-from .cfg import embed_default_color, reset_time_tolerance, url_regex
+from .cfg import embed_default_color, navigator_timeout, reset_time_tolerance, url_regex
 
 NO_DATA_HERE_EMBED = h.Embed(title="No data here!", color=embed_default_color)
 
@@ -146,7 +146,7 @@ class NavigatorView(nav.NavigatorView):
         self,
         *,
         pages: "NavPages",
-        timeout: t.Optional[t.Union[float, int, dt.timedelta]] = 120,
+        timeout: t.Optional[t.Union[float, int, dt.timedelta]] = navigator_timeout,
         autodefer: bool = True,
     ) -> None:
         super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)

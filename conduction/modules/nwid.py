@@ -92,7 +92,7 @@ async def on_start(event: h.StartedEvent):
 @lb.command("nwid", "Find out about This Week In Destinty (formerly the TWAB)")
 @lb.implements(lb.SlashCommand)
 async def nwid(ctx: lb.Context):
-    navigator = NavigatorView(pages=evweekly, timeout=60, autodefer=True)
+    navigator = NavigatorView(pages=evweekly, autodefer=True)
     await navigator.send(ctx.interaction)
 
 

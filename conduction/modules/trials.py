@@ -44,7 +44,7 @@ async def on_start(event: h.StartedEvent):
 @lb.command("trials", "Find out about this weeks Trials weapon and map")
 @lb.implements(lb.SlashCommand)
 async def trials_command(ctx: lb.Context):
-    navigator = NavigatorView(pages=trials_pages, timeout=60)
+    navigator = NavigatorView(pages=trials_pages)
     await navigator.send(ctx.interaction)
 
 

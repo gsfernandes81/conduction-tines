@@ -122,6 +122,7 @@ embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
 emoji = json.loads(_getenv("EMOJI"))
 followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 default_url = _getenv("DEFAULT_URL")
+navigator_timeout = int(_getenv("NAVIGATOR_TIMEOUT") or 120)
 
 # Database URLs
 db_url, db_url_async = _db_urls("MYSQL_URL")

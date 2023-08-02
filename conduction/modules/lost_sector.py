@@ -305,7 +305,7 @@ async def ls_group():
 @lb.command("today", "Find out about today's lost sector")
 @lb.implements(lb.SlashSubCommand)
 async def ls_today_command(ctx: lb.Context):
-    navigator = NavigatorView(pages=sectors, timeout=60)
+    navigator = NavigatorView(pages=sectors)
     await navigator.send(ctx.interaction)
 
 
@@ -319,7 +319,7 @@ async def ls_group_2():
 @lb.command("sector", "Find out about today's lost sector")
 @lb.implements(lb.SlashSubCommand)
 async def lost_sector_command(ctx: lb.Context):
-    navigator = NavigatorView(pages=sectors, timeout=60)
+    navigator = NavigatorView(pages=sectors)
     await navigator.send(ctx.interaction)
 
 

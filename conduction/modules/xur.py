@@ -82,7 +82,7 @@ async def on_start(event: h.StartedEvent):
 @lb.command("xur", "Find out what Xur has and where Xur is")
 @lb.implements(lb.SlashCommand)
 async def xur_command(ctx: lb.Context):
-    navigator = NavigatorView(pages=xur_pages, timeout=60)
+    navigator = NavigatorView(pages=xur_pages)
     await navigator.send(ctx.interaction)
 
 

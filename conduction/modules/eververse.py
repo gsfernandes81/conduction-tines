@@ -50,7 +50,7 @@ async def eververse_group(ctx: lb.Context):
 @lb.command("weekly", "Find out about this weeks eververse items")
 @lb.implements(lb.SlashSubCommand)
 async def eververse_weekly(ctx: lb.Context):
-    navigator = NavigatorView(pages=evweekly, timeout=60, autodefer=True)
+    navigator = NavigatorView(pages=evweekly, autodefer=True)
     await navigator.send(ctx.interaction)
 
 
