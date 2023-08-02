@@ -190,7 +190,7 @@ class MirroredChannel(Base):
         legacy: bool | None = True,
         enabled: bool | None = True,
         session: Optional[AsyncSession] = None,
-    ) -> List[MirroredChannel]:
+    ) -> List[int]:
         dest_id = int(dest_id)
         srcs = (
             await session.execute(
@@ -412,7 +412,7 @@ class MirroredChannel(Base):
         cls,
         threshold: int = 7,
         session: Optional[AsyncSession] = None,
-    ) -> Self:
+    ) -> List[Tuple[int, int]]:
         """Return mirrors that have failed too many times
 
         Mirrors that have failed more than `threshold` times are disabled
@@ -437,7 +437,7 @@ class MirroredChannel(Base):
         cls,
         threshold: int = 7,
         session: Optional[AsyncSession] = None,
-    ) -> Self:
+    ) -> List[Tuple[int, int]]:
         """Disable mirrors that have failed too many times
 
         Mirrors that have failed more than `threshold` times are disabled
