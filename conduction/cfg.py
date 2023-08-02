@@ -138,9 +138,9 @@ sheets_ls_url = _getenv("SHEETS_LS_URL")
 
 # Legacy database config
 legacy_db_url, legacy_db_url_async = _legacy_db_url("DATABASE_URL")
-ls_followable = int(_getenv("LS_FOLLOW_CHANNEL_ID"))
-xur_followable = int(_getenv("LS_FOLLOW_CHANNEL_ID"))
-reset_followable = int(_getenv("RESET_FOLLOW_CHANNEL_ID"))
+ls_followable = followables["ls"]
+xur_followable = followables["xur"]
+reset_followable = followables["reset"]
 
 #### Environment variables end ####
 
