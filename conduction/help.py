@@ -203,7 +203,9 @@ class HelpCommand(lb.DefaultHelpCommand):
                 page_no += 1
 
         if len(pages) > 1:
-            view = nav.NavigatorView(pages=pages, buttons=buttons, timeout=900)
+            view = nav.NavigatorView(
+                pages=pages, buttons=buttons, timeout=cfg.navigator_timeout
+            )
             await view.send(ctx.interaction)
         else:
             await ctx.respond(list(pages.values())[0])
