@@ -248,9 +248,19 @@ def ignore_non_kyber_servers(func):
 
 @ignore_non_kyber_servers
 async def message_create_repeater(event: h.MessageCreateEvent):
-    msg = event.message
-    bot = event.app
+    await message_create_repeater_impl(
+        event.message,
+        event.app,
+        await event.app.fetch_channel(event.message.channel_id),
+    )
 
+
+async def message_create_repeater_impl(
+    msg: h.Message,
+    bot: bot.CachedFetchBot,
+    channel: h.TextableChannel,
+    wait_for_crosspost: bool = True,
+):
     if (
         # If event is not from Kyber's server, do not hit db for it
         not (msg.guild_id and msg.guild_id == cfg.kyber_discord_server_id)
@@ -262,20 +272,16 @@ async def message_create_repeater(event: h.MessageCreateEvent):
     backoff_timer = 30
     while True:
         try:
-            mirrors = await MirroredChannel.get_or_fetch_dests(msg.channel_id)
+            mirrors = await MirroredChannel.get_or_fetch_dests(channel.id)
             if not mirrors:
                 # Return if this channel is not to be mirrored
                 # ie if no mirror list found for it
                 return
 
-            logging.info(
-                f"MessageCreateEvent received for messge in <#{msg.channel_id}>"
-            )
+            logging.info(f"MessageCreateEvent received for message in <#{channel.id}>")
 
-            if not h.MessageFlag.CROSSPOSTED in msg.flags:
-                logging.info(
-                    f"Message in <#{msg.channel_id}> not crossposted, waiting..."
-                )
+            if wait_for_crosspost and not h.MessageFlag.CROSSPOSTED in msg.flags:
+                logging.info(f"Message in <#{channel.id}> not crossposted, waiting...")
                 await bot.wait_for(
                     h.MessageUpdateEvent,
                     timeout=12 * 60 * 60,
@@ -284,7 +290,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                     and h.MessageFlag.CROSSPOSTED in e.message.flags,
                 )
                 logging.info(
-                    f"Crosspost event received for message in in <#{msg.channel_id}>, "
+                    f"Crosspost event received for message in in <#{channel.id}>, "
                     + "continuing..."
                 )
         except aio.TimeoutError:
@@ -341,7 +347,16 @@ async def message_create_repeater(event: h.MessageCreateEvent):
                 try:
                     async with discord_api_semaphore:
                         await bot.rest.crosspost_message(mirror_ch_id, mirrored_msg.id)
+
                 except Exception as e:
+                    if (
+                        isinstance(e, h.BadRequestError)
+                        and "This message has already been crossposted" in e.message
+                    ):
+                        # If the message has already been crossposted
+                        # then we can ignore the error
+                        break
+
                     e.add_note(
                         f"Failed to crosspost message in channel {mirror_ch_id} "
                         + "due to exception\n"
@@ -360,7 +375,7 @@ async def message_create_repeater(event: h.MessageCreateEvent):
         )
 
     # Always guard against infinite loops through posting to the source channel
-    mirrors = list(filter(lambda x: x != msg.channel_id, mirrors))
+    mirrors = list(filter(lambda x: x != channel.id, mirrors))
 
     announce_jobs = [aio.create_task(kernel(mirror_ch_id)) for mirror_ch_id in mirrors]
     return_in = 10  # seconds
@@ -418,18 +433,18 @@ async def message_create_repeater(event: h.MessageCreateEvent):
         # Log successes, failures and message pairs to the db
         maybe_exceptions = await aio.gather(
             MirroredChannel.log_legacy_mirror_failure_in_batch(
-                msg.channel_id,
+                channel.id,
                 [failure.dest_channel_id for failure in failures_to_log],
             ),
             MirroredChannel.log_legacy_mirror_success_in_batch(
-                msg.channel_id,
+                channel.id,
                 [success.dest_channel_id for success in successes_to_log],
             ),
             MirroredMessage.add_msgs_in_batch(
                 dest_msgs=[success.dest_message_id for success in successes_to_log],
                 dest_channels=[success.dest_channel_id for success in successes_to_log],
                 source_msg=msg.id,
-                source_channel=msg.channel_id,
+                source_channel=channel.id,
             ),
             return_exceptions=True,
         )
@@ -494,9 +509,10 @@ async def message_create_repeater(event: h.MessageCreateEvent):
 
 @ignore_non_kyber_servers
 async def message_update_repeater(event: h.MessageUpdateEvent):
-    msg = event.message
-    bot = event.app
+    await message_update_repeater_impl(event.message, event.app)
 
+
+async def message_update_repeater_impl(msg: h.Message, bot: bot.CachedFetchBot):
     backoff_timer = 30
     while True:
         try:
@@ -910,9 +926,52 @@ async def manual_add(ctx: lb.Context, src: str, dest: str, dest_server_id: str):
     await ctx.respond("Added mirror")
 
 
+@lb.command(
+    "mirror_send",
+    description="Manually mirror a message",
+    guilds=[cfg.control_discord_server_id, cfg.kyber_discord_server_id],
+    hidden=True,
+    ephemeral=True,
+)
+@lb.implements(lb.MessageCommand)
+async def manual_mirror_send(ctx: lb.MessageContext):
+    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
+        await ctx.respond("You are not allowed to use this command...")
+        return
+
+    await ctx.respond("Mirroring message...")
+    await message_create_repeater_impl(
+        ctx.options.target,
+        ctx.app,
+        await ctx.app.fetch_channel(ctx.channel_id),
+        wait_for_crosspost=False,
+    )
+    await ctx.edit_last_response("Mirrored message.")
+
+
+@lb.command(
+    "mirror_update",
+    description="Manually update a mirrored message",
+    guilds=[cfg.control_discord_server_id, cfg.kyber_discord_server_id],
+    hidden=True,
+    ephemeral=True,
+)
+@lb.implements(lb.MessageCommand)
+async def manual_mirror_update(ctx: lb.MessageContext):
+    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
+        await ctx.respond("You are not allowed to use this command...")
+        return
+
+    await ctx.respond("Updating message...")
+    await message_update_repeater_impl(ctx.options.target, ctx.app)
+    await ctx.edit_last_response("Updated message.")
+
+
 def register(bot):
     bot.listen(h.MessageCreateEvent)(message_create_repeater)
     bot.listen(h.MessageUpdateEvent)(message_update_repeater)
     bot.listen(h.MessageDeleteEvent)(message_delete_repeater)
 
     bot.command(mirror_group)
+    bot.command(manual_mirror_send)
+    bot.command(manual_mirror_update)
