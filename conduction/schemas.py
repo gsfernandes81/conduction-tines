@@ -172,7 +172,8 @@ class MirroredChannel(Base):
         if src_id in cls._dests_cache:
             # This condition is phrased specifically to allow
             # empty lists to be returned from the cache
-            return cls._dests_cache[src_id]
+            # Also copy the list to guard against mutation
+            return list(cls._dests_cache[src_id])
         else:
             dests = await cls.fetch_dests(src_id, session=session)
             cls._dests_cache[src_id] = dests
