@@ -217,13 +217,12 @@ def filter_discord_autoembeds(msg: h.Message | MessagePrototype):
     for embed in msg.embeds:
         embed: h.Embed
         embed_url = embed.url or ""
-        if (
-            embed_url not in content
-            and not embed.title
-            and not embed.description
-            and not embed.fields
-            and not embed.footer
-            and not embed.author
+        if embed_url not in content and (
+            embed.title
+            or embed.description
+            or embed.fields
+            or embed.footer
+            or embed.author
         ):
             filtered_embeds.append(embed)
     return filtered_embeds
