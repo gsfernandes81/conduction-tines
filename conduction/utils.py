@@ -16,9 +16,8 @@
 import datetime as dt
 import inspect
 import logging
-import traceback as tb
 import typing as t
-from asyncio import Semaphore
+from asyncio import Semaphore, create_task
 from random import randint
 
 import aiohttp
@@ -106,29 +105,17 @@ async def discord_error_logger(
     if not error_reference:
         error_reference = randint(1000000, 9999999)
 
-    error_message = "\n".join(tb.format_exception(e))
-
     alerts_channel = await bot.fetch_channel(cfg.alerts_channel)
-    error_message_chunk = ""
 
     async with error_logger_semaphore:
-        for error_msg_line in [
-            f"Exception with error reference `{error_reference}`:\n"
-        ] + error_message.split("\n"):
-            # Split the error message into lines and
-            if len(error_message_chunk) + len(error_msg_line) <= 1900:
-                # Build up lines of the error message until they
-                # are just under 1900 characters per chunk
-                error_message_chunk += error_msg_line + "\n"
-            else:
-                # And send each chunk
-                await alerts_channel.send("```\n" + error_message_chunk + "\n```")
-                error_message_chunk = ""
-
-        else:
-            # Send the final chunk
-            await alerts_channel.send(error_message_chunk)
-    logging.error(f"Error reference: {error_reference}")
+        task = create_task(
+            alerts_channel.send(
+                f"Exception {type(e)} with reference {error_reference} occurred"
+            )
+        )
+        logging.error(f"Error reference: {error_reference}")
+        logging.exception(e)
+        await task
 
 
 T = t.TypeVar("T")

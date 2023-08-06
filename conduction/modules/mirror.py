@@ -850,7 +850,6 @@ async def refresh_server_sizes(bot: bot.CachedFetchBot):
             )
             e.add_note(exception_note)
 
-            logging.exception(e)
             await utils.discord_error_logger(bot, e)
 
             if not should_retry_:
@@ -870,7 +869,6 @@ async def prune_message_db(bot: bot.CachedFetchBot):
         await MirroredMessage.prune()
     except Exception as e:
         e.add_note("Exception during routine pruning of MirroredMessage")
-        logging.exception(e)
         await utils.discord_error_logger(bot, e)
 
 
