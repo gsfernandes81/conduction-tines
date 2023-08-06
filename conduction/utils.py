@@ -201,7 +201,7 @@ async def wait_till_lightbulb_started(bot: lb.BotApp):
 def filter_discord_autoembeds(msg: h.Message | MessagePrototype):
     content = msg.content or ""
     filtered_embeds = []
-    for embed in msg.embeds:
+    for embed in msg.embeds or []:
         embed: h.Embed
         embed_url = embed.url or ""
         if embed_url not in content and (

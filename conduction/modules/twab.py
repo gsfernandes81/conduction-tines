@@ -36,6 +36,7 @@ class TWIDPages(NavPages):
         msg: MessagePrototype = utils.accumulate(
             [MessagePrototype.from_message(m) for m in messages]
         )
+        msg.embeds = utils.filter_discord_autoembeds(msg)
 
         urls = cfg.url_regex.findall(msg.content)
 

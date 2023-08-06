@@ -43,6 +43,8 @@ class XurPages(NavPages):
         # NOTE: This assumes that the xur message is sent with the
         # location gif as a link, not as an attachment
         # This will need to be updated if this is changed
+        for m in messages:
+            m.embeds = utils.filter_discord_autoembeds(m)
         msg_proto = (
             utils.accumulate(
                 [

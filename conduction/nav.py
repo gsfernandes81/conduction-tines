@@ -345,11 +345,7 @@ class NavPages(DateRangeDict):
             )
 
         # Remove discord auto image embeds
-        msg.embeds = list(
-            filter(
-                lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds
-            )
-        )
+        msg.embeds = utils.filter_discord_autoembeds(msg)
         # Remove embeds with no title or description
         msg.embeds = list(filter(lambda x: x.title or x.description, msg.embeds))
 

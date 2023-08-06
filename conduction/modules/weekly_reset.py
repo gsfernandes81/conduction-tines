@@ -39,6 +39,8 @@ class ResetPages(NavPages):
     def preprocess_messages(
         self, messages: t.List[MessagePrototype | h.Message]
     ) -> MessagePrototype:
+        for m in messages:
+            m.embeds = utils.filter_discord_autoembeds(m)
         msg_proto = (
             utils.accumulate([MessagePrototype.from_message(m) for m in messages])
             .merge_content_into_embed()

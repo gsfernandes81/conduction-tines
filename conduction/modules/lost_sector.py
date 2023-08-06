@@ -242,6 +242,8 @@ async def format_sector(
 
 class SectorMessages(NavPages):
     def preprocess_messages(self, messages: t.List[h.Message | MessagePrototype]):
+        for m in messages:
+            m.embeds = utils.filter_discord_autoembeds(m)
         processed_messages = [
             MessagePrototype.from_message(m)
             .merge_content_into_embed(prepend=False)
