@@ -27,9 +27,6 @@ from .autoposts import autopost_command_group, follow_control_command_maker
 REFERENCE_DATE = dt.datetime(2023, 7, 18, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["twab"]
-TWAB_FOLLOWABLES_DISABLED = True
-
-_no_register = TWAB_FOLLOWABLES_DISABLED
 
 
 class TWIDPages(NavPages):
