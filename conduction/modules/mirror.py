@@ -27,7 +27,7 @@ import lightbulb as lb
 from lightbulb.ext import tasks
 
 from .. import bot, cfg, utils
-from ..schemas import MirroredChannel, MirroredMessage, ServerStatistics, db_session
+from ..schemas import MirroredChannel, MirroredMessage, ServerStatistics
 
 
 class TimedSemaphore(aio.Semaphore):

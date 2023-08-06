@@ -15,7 +15,6 @@
 
 import sys
 
-import hikari as h
 import lightbulb as lb
 
 from .. import cfg, utils

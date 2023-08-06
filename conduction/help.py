@@ -18,12 +18,10 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
-from lightbulb import commands, context as context_, plugins
 import miru as m
 
 from roman import toRoman as to_roman
 from miru.ext import nav
-from miru.ext.nav.items import NavButton
 
 from . import cfg
 

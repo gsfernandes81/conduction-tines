@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 from collections import defaultdict
-from typing import List, Optional, Self, Tuple
+from typing import List, Optional, Tuple
 
 import regex as re
 from pytz import utc

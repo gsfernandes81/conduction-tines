@@ -18,9 +18,8 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
-from hmessage import HMessage as MessagePrototype
 
-from .. import cfg, utils
+from .. import cfg
 from ..nav import NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
 
