@@ -57,9 +57,7 @@ class XurPages(NavPages):
             .merge_content_into_embed(1)
             .merge_attachements_into_embed(default_url=cfg.default_url)
         )
-        msg_proto.embeds = MultiImageEmbedList.from_embed(
-            msg_proto.embeds[-1]
-        ).add_image(msg_proto.embeds[0].url)
+        msg_proto.embeds = MultiImageEmbedList.from_embed(msg_proto.embeds[-1])
 
         # Remove duplicate Arrives/Departs text from polarity embed
         for embed in msg_proto.embeds:
