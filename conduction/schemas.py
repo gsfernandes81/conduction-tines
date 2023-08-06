@@ -699,6 +699,16 @@ class ServerStatistics(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
+    async def fetch_server_populations(
+        cls, session: Optional[AsyncSession] = None
+    ) -> Tuple[int, int]:
+        """Returns tuples of server id to population"""
+        populations = (await session.execute(select(cls.id, cls.population))).fetchall()
+        populations = populations if populations else []
+        return populations
+
+    @classmethod
+    @utils.ensure_session(db_session)
     async def update_population(
         cls,
         id: int,

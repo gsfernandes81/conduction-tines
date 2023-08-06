@@ -19,6 +19,7 @@ import ssl
 from os import getenv as _getenv
 
 import hikari as h
+import typing as t
 import regex as re
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -120,7 +121,7 @@ disable_bad_channels = str(_getenv("DISABLE_BAD_CHANNELS")).lower() == "true"
 embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
 embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
 emoji = json.loads(_getenv("EMOJI"))
-followables = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
+followables: t.Dict[str, int] = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 default_url = _getenv("DEFAULT_URL")
 navigator_timeout = int(_getenv("NAVIGATOR_TIMEOUT") or 120)
 
