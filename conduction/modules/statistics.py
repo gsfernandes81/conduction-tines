@@ -53,7 +53,8 @@ async def populations_command(ctx: lb.Context):
 
     await ctx.respond(
         h.Embed(
-            description=f"### Top 7 servers by population:\n"
+            title="Server populations",
+            description=f"**Top 7 servers by population**\n"
             + "\n".join(
                 f"{i+1}. **{server_name}**: {population}"
                 for i, (server_name, population) in enumerate(top_7)
@@ -66,24 +67,38 @@ async def populations_command(ctx: lb.Context):
 
 
 @stats_command_group.child
-@lb.command("mirrors", "Mirror statistics", auto_defer=True, hidden=True)
+@lb.command("autoposts", "Mirror statistics", auto_defer=True, hidden=True)
 @lb.implements(lb.SlashSubCommand)
 async def mirror_stats_command(ctx: lb.Context):
     """Get the number of destinations for each cfg.followables channel"""
-    dest_statistics: t.Dict[str, int] = {}
-    for name, channel_id in cfg.followables.items():
-        dest_statistics[name] = await schemas.MirroredChannel.count_dests(channel_id)
+    dest_legacy_statistics: t.Dict[str, int] = {}
+    dest_non_legacy_statistics: t.Dict[str, int] = {}
 
-    await ctx.respond(
-        h.Embed(
-            description="### Mirror followers\n"
-            + "\n".join(
-                f"**{name.capitalize()}**: {dests}"
-                for name, dests in dest_statistics.items()
-            ),
-            color=cfg.embed_default_color,
+    for name, channel_id in cfg.followables.items():
+        dest_legacy_statistics[name] = await schemas.MirroredChannel.count_dests(
+            channel_id, legacy_only=True
         )
+        dest_non_legacy_statistics[name] = await schemas.MirroredChannel.count_dests(
+            channel_id, legacy_only=False
+        )
+
+    embed = h.Embed(
+        title="Autopost statistics",
+        description="These stats track all autoposts the bot is aware of. "
+        + "It will only be aware of autoposts for servers it is in "
+        + "and for channels it can see.",
+        color=cfg.embed_default_color,
     )
+
+    for name in dest_legacy_statistics.keys():
+        embed.add_field(
+            name=name.capitalize(),
+            value=f"```Followers : {dest_non_legacy_statistics[name]}\n"
+            + f"Mirrors   : {dest_legacy_statistics[name]}```",
+            inline=True,
+        )
+
+    await ctx.respond(embed)
 
 
 def register(bot: lb.BotApp):
