@@ -93,7 +93,15 @@ async def log_mirror_progress_to_discord(
     source_channel: Optional[h.GuildChannel] = None,
     is_completed: Optional[bool] = False,
 ):
-    for _ in range(3):
+    if existing_message and not is_completed:
+        max_tries: int = 1
+    else:
+        # If this is the first or the completion message
+        # retry forever
+        max_tries: int = -1
+
+    tries = 0
+    while tries != max_tries:
         try:
             log_channel: h.TextableGuildChannel = await bot.fetch_channel(
                 cfg.log_channel
@@ -217,7 +225,8 @@ async def log_mirror_progress_to_discord(
         except Exception as e:
             e.add_note("Failed to log mirror progress due to exception\n")
             logging.exception(e)
-            await aio.sleep(5)
+            tries += 1
+            await aio.sleep(5**tries)
 
 
 def ignore_non_kyber_servers(func):
