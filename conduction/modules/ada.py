@@ -51,7 +51,7 @@ if SINGLE_PAGE_MODE:
             try:
                 page = ada_pages[page_no]
             except IndexError:
-                await ctx.respond(NO_DATA_HERE_EMBED)
+                return await ctx.respond(NO_DATA_HERE_EMBED)
             except:
                 page_no -= 1
                 continue
@@ -60,7 +60,7 @@ if SINGLE_PAGE_MODE:
                 page_no -= 1
                 continue
             else:
-                await ctx.respond(**page.to_message_kwargs())
+                return await ctx.respond(**page.to_message_kwargs())
 
 else:
 
