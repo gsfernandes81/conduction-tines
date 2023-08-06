@@ -27,9 +27,6 @@ REFERENCE_DATE = dt.datetime(2023, 7, 14, 17, tzinfo=dt.timezone.utc)
 FOLLOWABLE_CHANNEL = cfg.followables["ada"]
 
 SINGLE_PAGE_MODE = True
-ADA_FOLLOWABLES_DISABLED = True
-
-_no_register = ADA_FOLLOWABLES_DISABLED
 
 
 async def on_start(event: h.StartedEvent):
