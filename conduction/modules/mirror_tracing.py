@@ -62,6 +62,7 @@ async def message_tracer(event: h.MessageCreateEvent):
                 legacy=False,
                 enabled=True,
             )
+        non_legacy_mirrors[src_ch_id].append(dest_ch_id)
     except Exception as e:
         e.add_note("Error adding traced mirror")
         logging.exception(e)
