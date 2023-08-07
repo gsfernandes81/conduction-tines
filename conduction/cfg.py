@@ -107,7 +107,6 @@ def _sheets_credentials(
 
 # Discord control server config
 control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
-control_discord_role_id = int(_getenv("CONTROL_DISCORD_ROLE_ID"))
 kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
 log_channel = int(_getenv("LOG_CHANNEL_ID"))
 alerts_channel = int(_getenv("ALERTS_CHANNEL_ID"))
