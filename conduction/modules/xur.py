@@ -45,6 +45,13 @@ class XurPages(NavPages):
         # This will need to be updated if this is changed
         for m in messages:
             m.embeds = utils.filter_discord_autoembeds(m)
+            # Suppress autoembeds
+            m.content = (
+                cfg.url_regex.sub(lambda x: f"<{x.group()}>", m.content or "")
+                .replace("<<", "<")
+                .replace(">>", ">")
+            )
+
         msg_proto = (
             utils.accumulate(
                 [
@@ -57,7 +64,6 @@ class XurPages(NavPages):
             .merge_content_into_embed(1)
             .merge_attachements_into_embed(default_url=cfg.default_url)
         )
-        msg_proto.embeds = MultiImageEmbedList.from_embed(msg_proto.embeds[-1])
 
         # Remove duplicate Arrives/Departs text from polarity embed
         for embed in msg_proto.embeds:
