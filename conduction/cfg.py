@@ -16,12 +16,21 @@
 import datetime as dt
 import json
 import ssl
-from os import getenv as _getenv
+from os import getenv as __getenv
 
 import hikari as h
 import typing as t
 import regex as re
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def _getenv(var_name: str) -> str:
+    var = __getenv(var_name)
+    if var is None:
+        raise ValueError(f"Environment variable {var_name} not set")
+    else:
+        print(f"Loaded {var_name}")
+    return str(var)
 
 
 def _test_env(var_name: str) -> list[int] | bool:
