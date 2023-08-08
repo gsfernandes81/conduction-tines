@@ -26,6 +26,7 @@ from .. import cfg, utils
 from ..bot import CachedFetchBot, UserCommandBot
 from ..nav import NavigatorView, NavPages
 from ..utils import space
+import logging
 from .autoposts import autopost_command_group, follow_control_command_maker
 
 REFERENCE_DATE = dt.datetime(2023, 7, 20, 17, tzinfo=dt.timezone.utc)
@@ -254,12 +255,18 @@ class SectorMessages(NavPages):
         processed_message = utils.accumulate(processed_messages)
 
         # Date correction
-        title = processed_message.embeds[0].title
-        if "Lost Sector Today" in title:
-            date = messages[0].timestamp
-            suffix = utils.get_ordinal_suffix(date.day)
-            title = title.replace("Today", f"for {date.strftime('%B %-d')}{suffix}", 1)
-            processed_message.embeds[0].title = title
+        try:
+            title = processed_message.embeds[0].title
+            if "Lost Sector Today" in title:
+                date = messages[0].timestamp
+                suffix = utils.get_ordinal_suffix(date.day)
+                title = title.replace(
+                    "Today", f"for {date.strftime('%B %-d')}{suffix}", 1
+                )
+                processed_message.embeds[0].title = title
+        except Exception as e:
+            e.add_note("Exception trying to replace date in lost sector title")
+            logging.exception(e)
 
         return processed_message
 
