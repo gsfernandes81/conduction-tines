@@ -32,6 +32,16 @@ def MirroredChannel():
     yield _MirroredChannel
 
 
+async def assert_all_srcs_equals(
+    src_list: list | set, mirrored_channel: _MirroredChannel = None
+):
+    src_list = set(src_list)
+    assert src_list == await mirrored_channel.fetch_all_srcs()
+    assert src_list == await mirrored_channel.fetch_all_srcs(legacy=True)
+    assert src_list == await mirrored_channel.get_or_fetch_all_srcs()
+    assert src_list == await mirrored_channel.get_or_fetch_all_srcs(legacy=True)
+
+
 @pytest.mark.asyncio
 async def test_add_and_fetch_mirror(MirroredChannel):
     src_id = 0
@@ -236,3 +246,53 @@ async def test_order_fetch_by_server_size(MirroredChannel: _MirroredChannel):
         dest_id_2,
         dest_id_3,
     ]
+
+
+@pytest.mark.asyncio
+async def test_add_and_fetch_mirror_srcs_cache(MirroredChannel: _MirroredChannel):
+    src_id = 0
+    src_id_2 = 4
+    dest_id = 1
+    dest_id_2 = 2
+    guild_id = 3
+
+    await assert_all_srcs_equals([], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.add_mirror(src_id, dest_id_2, guild_id, legacy=True)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.add_mirror(src_id_2, dest_id_2, guild_id, legacy=False)
+    # Added non legacy mirror, so should not be in cache
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.add_mirror(src_id_2, dest_id, guild_id, legacy=True)
+    # Added legacy mirror, so should be in cache
+    await assert_all_srcs_equals([src_id, src_id_2], mirrored_channel=MirroredChannel)
+
+
+@pytest.mark.asyncio
+async def test_set_legacy_with_mirror_dests_cache(MirroredChannel: _MirroredChannel):
+    src_id = 0
+    dest_id = 1
+    dest_id_2 = 5
+    guild_id = 2
+
+    await assert_all_srcs_equals([], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.add_mirror(src_id, dest_id, guild_id, legacy=True)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.set_legacy(src_id, dest_id, True)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.add_mirror(src_id, dest_id_2, guild_id, legacy=True)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.set_legacy(src_id, dest_id, False)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)
+
+    await MirroredChannel.set_legacy(src_id, dest_id, True)
+    await assert_all_srcs_equals([src_id], mirrored_channel=MirroredChannel)

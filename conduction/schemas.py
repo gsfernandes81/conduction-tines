@@ -18,7 +18,7 @@ from __future__ import annotations
 import asyncio
 import datetime as dt
 from collections import defaultdict
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Set
 
 import regex as re
 from pytz import utc
@@ -89,6 +89,7 @@ class MirroredChannel(Base):
         "legacy_disable_for_failure_on_date", DateTime, default=None
     )
     _dests_cache = defaultdict(list)
+    _all_srcs_cache = set()
 
     def __init__(
         self,
@@ -121,8 +122,12 @@ class MirroredChannel(Base):
         await session.merge(
             cls(src_id, dest_id, dest_server_id, legacy, enabled=enabled)
         )
+
         if legacy and enabled and dest_id not in cls._dests_cache[src_id]:
             cls._dests_cache[src_id].append(dest_id)
+
+        if legacy and src_id not in cls._all_srcs_cache:
+            cls._all_srcs_cache.add(src_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -210,6 +215,43 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
+    async def get_or_fetch_all_srcs(
+        cls,
+        legacy: bool | None = True,
+        session: Optional[AsyncSession] = None,
+    ) -> Set[int]:
+        """Fetch all srcs
+
+        WARNING: This is function has a failure mode where it will return
+        src_ids that may have been deleted with the removal of the last mirror
+        with this src. This is intentional to avoid the overhead of clearing
+        and refetching the cache on every mirror removal.
+
+        If you need to ensure that the returned src_ids are valid, use
+        fetch_all_srcs instead"""
+        if legacy and cls._all_srcs_cache:
+            return cls._all_srcs_cache
+        else:
+            srcs = await cls.fetch_all_srcs(legacy=legacy, session=session)
+            cls._all_srcs_cache = set(srcs)
+            return srcs
+
+    @classmethod
+    @utils.ensure_session(db_session)
+    async def fetch_all_srcs(
+        cls,
+        legacy: bool | None = True,
+        session: Optional[AsyncSession] = None,
+    ) -> Set[int]:
+        srcs = (
+            await session.execute(select(cls.src_id).where(cls.legacy == legacy))
+        ).fetchall()
+        srcs = srcs if srcs else []
+        srcs = [src[0] for src in srcs]
+        return set(srcs)
+
+    @classmethod
+    @utils.ensure_session(db_session)
     async def count_dests(
         cls,
         src_id: int,
@@ -271,8 +313,12 @@ class MirroredChannel(Base):
         )
         if legacy:
             cls._dests_cache[src_id].append(dest_id)
+            if src_id not in cls._all_srcs_cache:
+                cls._all_srcs_cache.add(src_id)
         else:
             cls._dests_cache[src_id].remove(dest_id)
+            if src_id in cls._all_srcs_cache:
+                cls._all_srcs_cache.remove(src_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -293,6 +339,13 @@ class MirroredChannel(Base):
         except ValueError:
             pass
 
+        # Note: We deliberately don't remove the src_id from the _all_srcs_cache
+        # since we don't know if there are other mirrors with the same src_id
+        # and clearing and refetching would be needlessly expensive
+        # Since mirrors are mostly designed as a one to many repeater of messages
+        # it is also unlikely that the last mirror with a given src_id will be
+        # removed.
+
     @classmethod
     @utils.ensure_session(db_session)
     async def remove_all_mirrors(
@@ -310,6 +363,13 @@ class MirroredChannel(Base):
                 cls._dests_cache[src_id].remove(dest_id)
             except ValueError:
                 pass
+
+        # Note: We deliberately don't remove the src_ids from the _all_srcs_cache
+        # since we don't know if there are other mirrors with the same src_id
+        # and clearing and refetching would be needlessly expensive
+        # Since mirrors are mostly designed as a one to many repeater of messages
+        # it is also unlikely that the last mirror with a given src_id will be
+        # removed.
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -468,6 +528,13 @@ class MirroredChannel(Base):
             except ValueError:
                 pass
 
+        # Note: We deliberately don't remove the src_id from the _all_srcs_cache
+        # since we don't know if there are other mirrors with the same src_id
+        # and clearing and refetching would be needlessly expensive
+        # Since mirrors are mostly designed as a one to many repeater of messages
+        # it is also unlikely that the last mirror with a given src_id will be
+        # removed.
+
         return mirrors_to_disable
 
     @classmethod
@@ -478,6 +545,7 @@ class MirroredChannel(Base):
         """Return mirrors that have been disabled for failure
 
         Mirrors that have been disabled for failure since `since` are returned
+        in the format (src_id, dest_id)
         """
         disabled_mirrors = await session.execute(
             select(cls.src_id, cls.dest_id).where(
@@ -503,6 +571,7 @@ class MirroredChannel(Base):
         """Undo auto disable for failure of mirrors
 
         Mirrors that have been disabled for failure since `since` are re-enabled
+        Mirrors are returned in the format (src_id, dest_id)
         """
         mirrors_to_enable = await cls.get_legacy_mirrors_disabled_for_failure(
             since=since, session=session
@@ -520,6 +589,13 @@ class MirroredChannel(Base):
                 legacy_error_rate=0,
             )
         )
+
+        # Add reenabled mirrors to the cache
+        for src_id, dest_id in mirrors_to_enable:
+            cls._dests_cache[src_id].append(dest_id)
+
+            if src_id not in cls._all_srcs_cache:
+                cls._all_srcs_cache.add(src_id)
 
         return mirrors_to_enable
 

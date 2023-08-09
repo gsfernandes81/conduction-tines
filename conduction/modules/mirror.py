@@ -229,7 +229,7 @@ async def log_mirror_progress_to_discord(
             await aio.sleep(5**tries)
 
 
-def ignore_non_kyber_servers(func):
+def ignore_non_src_channels(func):
     async def wrapped_func(event: h.MessageEvent):
         if isinstance(event, h.MessageCreateEvent) or isinstance(
             event, h.MessageUpdateEvent
@@ -239,12 +239,8 @@ def ignore_non_kyber_servers(func):
             msg = event.old_message
 
         if (
-            # If event is from Kyber's server, keep going
-            (
-                msg
-                and msg.guild_id
-                in [cfg.kyber_discord_server_id, cfg.control_discord_server_id]
-            )
+            # If event is from a known mirror src, keep going
+            (msg and msg.channel_id in await MirroredChannel.get_or_fetch_all_srcs())
             # also keep going if we are running in a test env
             # keep this towards the end so short circuiting in test_env
             # does not hide logic errors
@@ -255,7 +251,19 @@ def ignore_non_kyber_servers(func):
     return wrapped_func
 
 
-@ignore_non_kyber_servers
+def ignore_self(func):
+    async def wrapped_func(event: h.MessageEvent):
+        if event.author_id == event.app.get_me().id:
+            # Never respond to self or mirror self
+            return
+
+        return await func(event)
+
+    return wrapped_func
+
+
+@ignore_non_src_channels
+@ignore_self
 async def message_create_repeater(event: h.MessageCreateEvent):
     await message_create_repeater_impl(
         event.message,
@@ -270,14 +278,6 @@ async def message_create_repeater_impl(
     channel: h.TextableChannel,
     wait_for_crosspost: bool = True,
 ):
-    if (
-        # If event is not from Kyber's server, do not hit db for it
-        not (msg.guild_id and msg.guild_id == cfg.kyber_discord_server_id)
-        # unless we are running in a test env
-        and not cfg.test_env
-    ):
-        return
-
     backoff_timer = 30
     while True:
         try:
@@ -516,7 +516,8 @@ async def message_create_repeater_impl(
         )
 
 
-@ignore_non_kyber_servers
+@ignore_non_src_channels
+@ignore_self
 async def message_update_repeater(event: h.MessageUpdateEvent):
     await message_update_repeater_impl(event.message, event.app)
 
@@ -543,6 +544,10 @@ async def message_update_repeater_impl(msg: h.Message, bot: bot.CachedFetchBot):
             break
 
     mirror_start_time = perf_counter()
+
+    # Fetch message again since update events aren't guaranteed to
+    # include unchanged data
+    msg = bot.rest.fetch_message(msg.channel_id, msg.id)
 
     # Remove discord auto image embeds
     msg.embeds = list(
@@ -661,7 +666,7 @@ async def message_update_repeater_impl(msg: h.Message, bot: bot.CachedFetchBot):
             break
 
 
-@ignore_non_kyber_servers
+@ignore_non_src_channels
 async def message_delete_repeater(event: h.MessageDeleteEvent):
     msg_id = event.message_id
     msg = event.old_message
@@ -947,6 +952,7 @@ async def manual_mirror_send(ctx: lb.MessageContext):
         return
 
     await ctx.respond("Mirroring message...")
+    logging.info(f"Manually mirroring for channel id {ctx.options.target.channel_id}")
     await message_create_repeater_impl(
         ctx.options.target,
         ctx.app,
@@ -970,6 +976,10 @@ async def manual_mirror_update(ctx: lb.MessageContext):
         return
 
     await ctx.respond("Updating message...")
+    logging.info(
+        f"Manually updating mirrored message {ctx.options.target.id} "
+        f" in channel id {ctx.options.target.channel_id}"
+    )
     await message_update_repeater_impl(ctx.options.target, ctx.app)
     await ctx.edit_last_response("Updated message.")
 
