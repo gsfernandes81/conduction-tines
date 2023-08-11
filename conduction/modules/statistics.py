@@ -17,6 +17,7 @@ import typing as t
 
 import hikari as h
 import lightbulb as lb
+import math
 
 from .. import cfg, schemas
 from ..bot import CachedFetchBot
@@ -51,16 +52,36 @@ async def populations_command(ctx: lb.Context):
         except:
             top_7[top_7.index((server_id, population))] = (server_id, population)
 
+    # Logarithmic breakdown
+    logs = {}
+    for _, population in populations:
+        log = math.floor(math.log10(population))
+        if log in logs:
+            logs[log] += 1
+        else:
+            logs[log] = 1
+
+    log_breakdown_text = ""
+    for log_key in sorted(logs.keys()):
+        log_breakdown_text += (
+            f"\nBetween **{10**log_key:,d}** and "
+            + f"**{10**(log_key+1):,d}**: "
+            + f"{logs[log_key]:,d}"
+        )
+
     await ctx.respond(
         h.Embed(
             title="Server populations",
-            description=f"**Top 7 servers by population**\n"
+            description=""
+            + f"\n**Total**: {sum(map(lambda x: x[1], populations)):,d}"
+            + f"\n**Top 7 servers by population**\n"
             + "\n".join(
-                f"{i+1}. **{server_name}**: {population}"
+                f"{i+1}. **{server_name}**: {population:,d}"
                 for i, (server_name, population) in enumerate(top_7)
             )
-            + f"\n**Other servers**: {rest}"
-            + f"\n\nTotal: {sum(map(lambda x: x[1], populations))}",
+            + f"\n**Other servers**: {rest:,d}"
+            + "\n\n**Logarithmic breakdown of server populations**"
+            + log_breakdown_text,
             color=cfg.embed_default_color,
         )
     )
