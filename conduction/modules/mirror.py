@@ -547,12 +547,10 @@ async def message_update_repeater_impl(msg: h.Message, bot: bot.CachedFetchBot):
 
     # Fetch message again since update events aren't guaranteed to
     # include unchanged data
-    msg = bot.rest.fetch_message(msg.channel_id, msg.id)
+    msg = await bot.rest.fetch_message(msg.channel_id, msg.id)
 
     # Remove discord auto image embeds
-    msg.embeds = list(
-        filter(lambda x: msg.content and x.url and x.url not in msg.content, msg.embeds)
-    )
+    msg.embeds = utils.filter_discord_autoembeds(msg)
 
     async def kernel(
         msg_id: int, channel_id: int, current_retries: Optional[int] = 0, delay: int = 0
