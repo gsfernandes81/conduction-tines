@@ -131,7 +131,7 @@ async def log_mirror_progress_to_discord(
             )
 
             if not existing_message:
-                if source_channel:
+                if source_channel or source_message:
                     source_channel: h.TextableGuildChannel = (
                         await bot.fetch_channel(source_message.channel_id)
                         if not source_channel
@@ -141,14 +141,17 @@ async def log_mirror_progress_to_discord(
                             else await bot.fetch_channel(source_channel)
                         )
                     )
-                if source_message and source_channel:
-                    source_guild = await bot.fetch_guild(source_channel.guild_id)
-                    source_message_summary = _get_message_summary(source_message)
-                    source_message_link = source_message.make_link(source_guild)
 
+                if source_channel:
+                    source_guild = await bot.fetch_guild(source_channel.guild_id)
+                    source_message_link = source_message.make_link(source_guild)
+                else:
+                    source_message_link = ""
+
+                if source_message:
+                    source_message_summary = _get_message_summary(source_message)
                 else:
                     source_message_summary = "Unknown"
-                    source_message_link = ""
 
                 if source_channel:
                     source_channel_link = (
@@ -162,7 +165,7 @@ async def log_mirror_progress_to_discord(
                 embed.add_field(
                     "Source message",
                     f"[{source_message_summary}]({source_message_link})"
-                    if source_message
+                    if source_message_link
                     else source_message_summary,
                     inline=True,
                 ).add_field(
