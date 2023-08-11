@@ -131,16 +131,17 @@ async def log_mirror_progress_to_discord(
             )
 
             if not existing_message:
-                source_channel: h.TextableGuildChannel = (
-                    await bot.fetch_channel(source_message.channel_id)
-                    if not source_channel
-                    else (
-                        source_channel
-                        if isinstance(source_channel, h.GuildChannel)
-                        else await bot.fetch_channel(source_channel)
+                if source_channel:
+                    source_channel: h.TextableGuildChannel = (
+                        await bot.fetch_channel(source_message.channel_id)
+                        if not source_channel
+                        else (
+                            source_channel
+                            if isinstance(source_channel, h.GuildChannel)
+                            else await bot.fetch_channel(source_channel)
+                        )
                     )
-                )
-                if source_message:
+                if source_message and source_channel:
                     source_guild = await bot.fetch_guild(source_channel.guild_id)
                     source_message_summary = _get_message_summary(source_message)
                     source_message_link = source_message.make_link(source_guild)
@@ -149,12 +150,13 @@ async def log_mirror_progress_to_discord(
                     source_message_summary = "Unknown"
                     source_message_link = ""
 
-                source_channel_link = (
-                    "https://discord.com/channels/"
-                    + str(source_channel.guild_id)
-                    + "/"
-                    + str(source_channel.id)
-                )
+                if source_channel:
+                    source_channel_link = (
+                        "https://discord.com/channels/"
+                        + str(source_channel.guild_id)
+                        + "/"
+                        + str(source_channel.id)
+                    )
 
                 embed = h.Embed(color=cfg.embed_default_color, title=title)
                 embed.add_field(
@@ -165,7 +167,9 @@ async def log_mirror_progress_to_discord(
                     inline=True,
                 ).add_field(
                     "Source channel",
-                    f"[{source_channel.name}]({source_channel_link})",
+                    f"[{source_channel.name}]({source_channel_link})"
+                    if source_channel
+                    else "Unknown",
                     inline=True,
                 ).add_field(
                     "Completed", str(successes), inline=True
@@ -677,7 +681,21 @@ async def message_delete_repeater(event: h.MessageDeleteEvent):
                 # Return if this channel is not to be mirrored
                 # ie if no mirror list found for it
                 return
+        except Exception as e:
+            await utils.discord_error_logger(bot, e)
+            await aio.sleep(backoff_timer)
+            backoff_timer += 30 / backoff_timer
+        else:
+            await message_delete_repeater_impl(msg_id, msg, bot)
+            return
 
+
+async def message_delete_repeater_impl(
+    msg_id: int, msg: Optional[h.Message], bot: bot.CachedFetchBot
+):
+    backoff_timer = 30
+    while True:
+        try:
             msgs_to_delete = await MirroredMessage.get_dest_msgs_and_channels(msg_id)
             if not msgs_to_delete:
                 # Return if this message was not mirrored for any reason
@@ -732,7 +750,7 @@ async def message_delete_repeater(event: h.MessageDeleteEvent):
         len(msgs_to_delete),
         msg,
         mirror_start_time,
-        source_channel=event.channel_id,
+        source_channel=msg.channel_id if msg else None,
         title="Mirror delete progress",
     )
 
@@ -983,6 +1001,31 @@ async def manual_mirror_update(ctx: lb.MessageContext):
     )
     await message_update_repeater_impl(ctx.options.target, ctx.app)
     await ctx.edit_last_response("Updated message.")
+
+
+@mirror_group.child
+@lb.option("message_id", description="Message to delete", type=str)
+@lb.command(
+    "delete_msg",
+    description="Manually delete a mirrored message",
+    guilds=[cfg.control_discord_server_id, cfg.kyber_discord_server_id],
+    hidden=True,
+    ephemeral=True,
+    pass_options=True,
+)
+@lb.implements(lb.SlashSubCommand)
+async def manual_mirror_delete(ctx: lb.SlashContext, message_id: str):
+    if not ctx.author.id in await ctx.bot.fetch_owner_ids():
+        await ctx.respond("You are not allowed to use this command...")
+        return
+
+    mid = int(message_id)
+    bot: lb.BotApp = ctx.app
+
+    await ctx.respond("Deleting message...")
+    logging.info(f"Manually deleting mirrored message {mid}")
+    await message_delete_repeater_impl(mid, bot.cache.get_message(mid), ctx.app)
+    await ctx.edit_last_response("Deleted messages.")
 
 
 def register(bot):
