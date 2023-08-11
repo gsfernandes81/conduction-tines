@@ -26,6 +26,7 @@ sqlalchemy = "^2.0.1"
 uvloop = "^0.17.0"
 yarl = "^1.8.2"
 roman = "^4.1"
+cryptography = "^41.0.3"
 
 [tool.poetry.group.dev.dependencies]
 bandit = "^1.7.4"

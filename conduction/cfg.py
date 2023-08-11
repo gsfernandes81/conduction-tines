@@ -86,9 +86,13 @@ def _db_config():
         "class_": AsyncSession,
     }
 
-    ssl_ctx = ssl.create_default_context(cafile="/etc/ssl/certs/ca-certificates.crt")
-    ssl_ctx.verify_mode = ssl.CERT_REQUIRED
-    db_connect_args = {"ssl": ssl_ctx}
+    db_connect_args = {}
+    if _getenv("MYSQL_SSL", "true") == "true":
+        ssl_ctx = ssl.create_default_context(
+            cafile="/etc/ssl/certs/ca-certificates.crt"
+        )
+        ssl_ctx.verify_mode = ssl.CERT_REQUIRED
+        db_connect_args.update({"ssl": ssl_ctx})
     return db_session_kwargs, db_session_kwargs_sync, db_connect_args
 
 
