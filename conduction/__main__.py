@@ -15,6 +15,9 @@
 
 import logging
 
+import logwood.compat
+import aiodebug.log_slow_callbacks
+
 import hikari as h
 import lightbulb as lb
 import miru
@@ -38,6 +41,10 @@ bot = Bot(
     help_class=help.HelpCommand,
     help_slash_command=True,
 )
+
+
+logwood.compat.redirect_standard_logging()
+aiodebug.log_slow_callbacks.enable(0.05)
 
 
 async def update_status(guild_count: int):

@@ -21,6 +21,7 @@ from os import getenv as __getenv
 import hikari as h
 import typing as t
 import regex as re
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -28,11 +29,11 @@ def _getenv(var_name: str, default: t.Optional[str] = None) -> str:
     var = __getenv(var_name)
     if var is None:
         if default is not None:
-            print(f"Loaded {var_name} with default value {default}")
+            logging.info(f"Loaded variable {var_name} with default value {default}")
             return default
         raise ValueError(f"Environment variable {var_name} not set")
     else:
-        print(f"Loaded {var_name}")
+        logging.info(f"Loaded variable {var_name}")
     return str(var)
 
 
@@ -119,7 +120,18 @@ def _sheets_credentials(
     return gsheets_credentials
 
 
+######### loglevel config #########
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname).1s %(name)s %(message)s |",
+)
 ###### Environment variables ######
+
+# Discord environment config
+test_env = _test_env("TEST_ENV")
+discord_token = _getenv("DISCORD_TOKEN")
+disable_bad_channels = str(_getenv("DISABLE_BAD_CHANNELS")).lower() == "true"
 
 # Discord control server config
 control_discord_server_id = int(_getenv("CONTROL_DISCORD_SERVER_ID"))
@@ -127,10 +139,6 @@ kyber_discord_server_id = int(_getenv("KYBER_DISCORD_SERVER_ID"))
 log_channel = int(_getenv("LOG_CHANNEL_ID"))
 alerts_channel = int(_getenv("ALERTS_CHANNEL_ID"))
 
-# Discord environment config
-discord_token = _getenv("DISCORD_TOKEN")
-test_env = _test_env("TEST_ENV")
-disable_bad_channels = str(_getenv("DISABLE_BAD_CHANNELS")).lower() == "true"
 
 # Discord constants
 embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
