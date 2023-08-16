@@ -1,3 +1,3 @@
 #!/bin/sh
 source /venv/bin/activate
-honcho start
+honcho start --no-prefix
