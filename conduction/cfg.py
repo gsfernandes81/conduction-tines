@@ -124,7 +124,7 @@ def _sheets_credentials(
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname).1s %(name)s %(message)s |",
+    format="%(asctime)s %(levelname).1s %(name)s | %(message)s",
 )
 ###### Environment variables ######
 
