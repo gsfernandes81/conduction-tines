@@ -221,6 +221,10 @@ def filter_discord_autoembeds(msg: h.Message | MessagePrototype):
     return filtered_embeds
 
 
+def followable_name(*, id: int) -> str | int:
+    return next((key for key, value in cfg.followables.items() if value == id), id)
+
+
 class space:
     zero_width = "\u200b"
     hair = "\u200a"

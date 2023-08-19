@@ -307,10 +307,21 @@ async def message_create_repeater_impl(
                 # ie if no mirror list found for it
                 return
 
-            logging.info(f"MessageCreateEvent received for message in <#{channel.id}>")
+            channel_name_or_id = str(utils.followable_name(id=channel.id))
+            logging.info(
+                f"MessageCreateEvent received for message in channel: {channel_name_or_id}"
+            )
+
+            # The below is to make sure we aren't using a reference to a message that
+            # has already changed (in particular, has already been crossposted)
+            # Using such a reference would result in us waiting forever for a crosspost
+            # event that has already fired
+            msg = await bot.rest.fetch_message(msg.channel_id, msg.id)
 
             if wait_for_crosspost and not h.MessageFlag.CROSSPOSTED in msg.flags:
-                logging.info(f"Message in <#{channel.id}> not crossposted, waiting...")
+                logging.info(
+                    f"Message in channel {channel_name_or_id} not crossposted, waiting..."
+                )
                 await bot.wait_for(
                     h.MessageUpdateEvent,
                     timeout=12 * 60 * 60,
@@ -319,7 +330,7 @@ async def message_create_repeater_impl(
                     and h.MessageFlag.CROSSPOSTED in e.message.flags,
                 )
                 logging.info(
-                    f"Crosspost event received for message in in <#{channel.id}>, "
+                    f"Crosspost event received for message in channel {channel_name_or_id}, "
                     + "continuing..."
                 )
         except aio.TimeoutError:
