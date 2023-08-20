@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
 from collections import defaultdict
-from typing import List, Optional, Tuple, Set
+from typing import List, Optional, Set, Tuple
 
 import regex as re
 from pytz import utc
@@ -39,7 +40,9 @@ from . import cfg, utils
 
 Base = declarative_base()
 OldBase = declarative_base()
-db_engine = create_async_engine(cfg.db_url_async, connect_args=cfg.db_connect_args)
+db_engine = create_async_engine(
+    cfg.db_url_async, connect_args=cfg.db_connect_args, **cfg.db_engine_args
+)
 db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
 
@@ -49,10 +52,7 @@ db_session.configure(
         Base: create_async_engine(
             cfg.db_url_async,
             connect_args=cfg.db_connect_args,
-            max_overflow=-1,
-            isolation_level="READ COMMITTED",
-            pool_pre_ping=True,
-            pool_recycle=3600,
+            **cfg.db_engine_args
         ),
         OldBase: create_async_engine(
             cfg.legacy_db_url_async,
@@ -1275,8 +1275,10 @@ async def recreate_all():
     # db_session = sessionmaker(db_engine, **cfg.db_session_kwargs)
 
     async with db_engine.begin() as conn:
+        logging.info(f"Dropping tables: {Base.metadata.tables.keys()}")
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
+        logging.info(f"Created tables: {Base.metadata.tables.keys()}")
 
 
 if __name__ == "__main__":

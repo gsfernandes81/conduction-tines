@@ -94,7 +94,14 @@ def _db_config():
         )
         ssl_ctx.verify_mode = ssl.CERT_REQUIRED
         db_connect_args.update({"ssl": ssl_ctx})
-    return db_session_kwargs, db_session_kwargs_sync, db_connect_args
+
+    db_engine_args = {
+        "max_overflow": -1,
+        "isolation_level": "READ COMMITTED",
+        "pool_pre_ping": True,
+        "pool_recycle": 3600,
+    }
+    return db_session_kwargs, db_session_kwargs_sync, db_connect_args, db_engine_args
 
 
 def _sheets_credentials(
@@ -174,7 +181,12 @@ reset_followable = followables["weekly_reset"]
 
 ####### Configs & constants #######
 
-db_session_kwargs, db_session_kwargs_sync, db_connect_args = _db_config()
+(
+    db_session_kwargs,
+    db_session_kwargs_sync,
+    db_connect_args,
+    db_engine_args,
+) = _db_config()
 lightbulb_params = _lightbulb_params()
 reset_time_tolerance = dt.timedelta(minutes=60)
 url_regex = re.compile(
