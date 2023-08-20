@@ -24,7 +24,7 @@ from hmessage import HMessage as MessagePrototype
 
 from .. import cfg, utils
 from ..bot import CachedFetchBot, UserCommandBot
-from ..nav import NavigatorView, NavPages
+from ..nav import NavigatorView, NavPages, NO_DATA_HERE_EMBED
 from ..utils import space
 import logging
 from .autoposts import autopost_command_group, follow_control_command_maker
@@ -256,7 +256,7 @@ class SectorMessages(NavPages):
 
         # Date correction
         try:
-            title = processed_message.embeds[0].title
+            title = str(processed_message.embeds[0].title)
             if "Lost Sector Today" in title:
                 date = messages[0].timestamp
                 suffix = utils.get_ordinal_suffix(date.day)
@@ -281,13 +281,21 @@ class SectorMessages(NavPages):
         lookahead_dict = {}
 
         for date in [start_date + self.period * n for n in range(self.lookahead_len)]:
-            sector = sector_on(date)
-
-            # Follow the hyperlink to have the newest image embedded
-            lookahead_dict = {
-                **lookahead_dict,
-                date: await format_sector(sector, date=date),
-            }
+            try:
+                sector = sector_on(date)
+            except KeyError:
+                # A KeyError will be raised if TBC is selected for the google sheet
+                # In this case, we will just return a message saying that there is no data
+                lookahead_dict = {
+                    **lookahead_dict,
+                    date: MessagePrototype(embeds=[NO_DATA_HERE_EMBED]),
+                }
+            else:
+                # Follow the hyperlink to have the newest image embedded
+                lookahead_dict = {
+                    **lookahead_dict,
+                    date: await format_sector(sector, date=date),
+                }
 
         return lookahead_dict
 
