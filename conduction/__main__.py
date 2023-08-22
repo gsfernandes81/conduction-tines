@@ -25,10 +25,10 @@ import uvloop
 from lightbulb.ext import tasks
 
 from . import cfg, modules, schemas, help
-from .bot import CachedFetchBot, UserCommandBot, CustomHelpBot, FetchOwnerIDsOverrideBot
+from .bot import CachedFetchBot, UserCommandBot, CustomHelpBot
 
 
-class Bot(FetchOwnerIDsOverrideBot, UserCommandBot, CachedFetchBot, CustomHelpBot):
+class Bot(UserCommandBot, CachedFetchBot, CustomHelpBot):
     pass
 
 

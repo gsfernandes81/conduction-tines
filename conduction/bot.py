@@ -450,11 +450,3 @@ class CustomHelpBot(lb.BotApp):
                 commands_group = command.subcommands
 
         return command_map
-
-
-class FetchOwnerIDsOverrideBot(CachedFetchBot):
-    async def fetch_owner_ids(self) -> t.Sequence[h.Snowflakeish]:
-        # Temporarily hardcoded discord user ids for myself and kyber
-        # Verified bots cannot be moved to teams without contacting
-        # support
-        return [282994302273978378, 655755547211202582]
