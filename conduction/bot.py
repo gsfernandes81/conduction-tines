@@ -30,15 +30,31 @@ from . import cfg, schemas, utils
 class CachedFetchBot(lb.BotApp):
     """lb.BotApp subclass with async methods that fetch objects from cache if possible"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.cache: h.api.MutableCache
+
     async def fetch_channel(self, channel_id: int):
         """This method fetches a channel from the cache or from discord if not cached"""
-        return self.cache.get_guild_channel(
-            channel_id
-        ) or await self.rest.fetch_channel(channel_id)
+        channel = self.cache.get_guild_channel(channel_id)
+        if channel:
+            return channel
+
+        channel = await self.rest.fetch_channel(channel_id)
+        self.cache.set_guild_channel(channel)
+
+        return channel
 
     async def fetch_guild(self, guild_id: int):
         """This method fetches a guild from the cache or from discord if not cached"""
-        return self.cache.get_guild(guild_id) or await self.rest.fetch_guild(guild_id)
+        guild = self.cache.get_guild(guild_id)
+        if guild:
+            return guild
+
+        guild = await self.rest.fetch_guild(guild_id)
+        self.cache.set_guild(guild)
+
+        return guild
 
     async def fetch_message(
         self, channel: h.SnowflakeishOr[h.TextableChannel], message_id: int
@@ -54,25 +70,36 @@ class CachedFetchBot(lb.BotApp):
             # just being paranoid
             channel = await self.fetch_channel(channel)
 
-        return self.cache.get_message(message_id) or await self.rest.fetch_message(
-            channel, message_id
-        )
+        message = self.cache.get_message(message_id)
+        if message:
+            return message
+
+        message = await self.rest.fetch_message(channel, message_id)
+        self.cache.set_message(message)
+
+        return message
 
     async def fetch_emoji(self, guild_id, emoji_id):
         """This method fetches an emoji from the cache or from discord if not cached"""
         # TODO allow passing a guild (not id) to this method as well for convenience
-        return self.cache.get_emoji(emoji_id) or await self.rest.fetch_emoji(
-            guild_id, emoji_id
-        )
 
-    async def fetch_user(self, user: int):
+        emoji = self.cache.get_emoji(emoji_id)
+        if emoji:
+            return emoji
+
+        emoji = await self.rest.fetch_emoji(guild_id, emoji_id)
+        self.cache.set_emoji(emoji)
+
+        return emoji
+
+    async def fetch_user(self, user_id: int):
         """This method fetches a user from the cache or from discord if not cached"""
-        return self.cache.get_user(user) or await self.rest.fetch_user(user)
+        return self.cache.get_user(user_id) or await self.rest.fetch_user(user_id)
 
-    async def fetch_owner(self):
-        """This method fetches the primary owner of the bot from the cache or from
+    async def fetch_owner(self, index: int = 0) -> h.User:
+        """This method fetches the owner of the bot from the cache or from
         discord if not cached"""
-        return await self.fetch_user((await self.fetch_owner_ids())[-1])
+        return await self.fetch_user((await self.fetch_owner_ids())[index])
 
 
 class SchemaBackedCommand:
