@@ -32,6 +32,25 @@ end_user_allowed_perms = (
     h.Permissions.ADMINISTRATOR,
 )
 
+
+def bot_missing_permissions_embed(bot_owner: h.User):
+    return h.Embed(
+        title="Missing Permissions",
+        description="The bot is missing permissions in this channel.\n"
+        + "Please make sure it has the following permissions:"
+        + "```\n"
+        + "- View Channel\n"
+        + "- Manage Webhooks\n"
+        + "- Send Messages\n"
+        + "```\n"
+        + "If you are still having issues, please contact me on discord!\n",
+        color=cfg.embed_error_color,
+    ).set_footer(
+        f"@{bot_owner.username}",
+        icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
+    )
+
+
 autopost_command_group = lb.command(name="autopost", description="Autopost control")(
     lb.implements(lb.SlashCommandGroup)(lambda: None)
 )
@@ -79,6 +98,13 @@ def follow_control_command_maker(
         option = bool(option)
         bot: t.Union[CachedFetchBot, UserCommandBot] = ctx.bot
         try:
+            try:
+                await bot.fetch_channel(ctx.channel_id)
+            except h.ForbiddenError:
+                bot_owner = await bot.fetch_owner()
+                await ctx.respond(bot_missing_permissions_embed(bot_owner))
+                return
+
             if not (
                 await utils.check_invoker_is_owner(ctx)
                 or await utils.check_invoker_has_perms(ctx, end_user_allowed_perms)
@@ -111,7 +137,7 @@ def follow_control_command_maker(
                 h.ChannelType.GUILD_PRIVATE_THREAD,
                 h.ChannelType.GUILD_NEWS_THREAD,
             ]:
-                bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[-1])
+                bot_owner = await bot.fetch_owner(-1)
                 await ctx.respond(
                     h.Embed(
                         title="Unsupported channel type",
@@ -203,30 +229,14 @@ def follow_control_command_maker(
                     # If we are missing permissions, then we can't delete the webhook
                     # In this case, notify the user with a list of possibly missing
                     # permissions
-                    bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[-1])
-                    await ctx.respond(
-                        h.Embed(
-                            title="Missing Permissions",
-                            description="The bot is missing permissions in this channel.\n"
-                            + "Please make sure it has the following permissions:"
-                            + "```\n"
-                            + "- View Channel\n"
-                            + "- Manage Webhooks\n"
-                            + "- Send Messages\n"
-                            + "```\n"
-                            + "If you are still having issues, please contact me on discord!\n",
-                            color=cfg.embed_error_color,
-                        ).set_footer(
-                            f"@{bot_owner.username}",
-                            icon=bot_owner.avatar_url or bot_owner.default_avatar_url,
-                        )
-                    )
+                    bot_owner = await bot.fetch_owner(-1)
+                    await ctx.respond(bot_missing_permissions_embed(bot_owner))
                     return
                 else:
                     raise e
         except Exception as e:
             error_reference = randint(1000000, 9999999)
-            bot_owner = await bot.fetch_user((await bot.fetch_owner_ids())[-1])
+            bot_owner = await bot.fetch_owner(-1)
             await ctx.respond(
                 h.Embed(
                     title="Pardon our dust!",
