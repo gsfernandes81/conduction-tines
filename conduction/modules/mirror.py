@@ -312,6 +312,10 @@ async def message_create_repeater_impl(
                 f"MessageCreateEvent received for message in channel: {channel_name_or_id}"
             )
 
+            # There is an issue causing only one mirror to be logged and
+            # posted to, print all mirrors to find out what is going on
+            logging.warning(f"{channel_name_or_id.upper()} MIRRORS: {mirrors}")
+
             # The below is to make sure we aren't using a reference to a message that
             # has already changed (in particular, has already been crossposted)
             # Using such a reference would result in us waiting forever for a crosspost
