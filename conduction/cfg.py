@@ -169,12 +169,6 @@ gsheets_credentials = _sheets_credentials(
 )
 sheets_ls_url = _getenv("SHEETS_LS_URL")
 
-# Legacy database config
-legacy_db_url, legacy_db_url_async = _legacy_db_url("DATABASE_URL")
-ls_followable = followables["lost_sector"]
-xur_followable = followables["xur"]
-reset_followable = followables["weekly_reset"]
-
 #### Environment variables end ####
 
 ###################################
