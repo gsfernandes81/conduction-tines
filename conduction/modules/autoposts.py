@@ -99,7 +99,11 @@ def follow_control_command_maker(
         bot: t.Union[CachedFetchBot, UserCommandBot] = ctx.bot
         try:
             try:
-                await bot.fetch_channel(ctx.channel_id)
+                # Note: Using the cache here seems to result in utils.check_invoker_has_perms
+                # failing if bot.rest.fetch_channel returns a forbidden error later due to
+                # what I am assuming is a change in permissions after the cache is initially
+                # populated
+                await bot.rest.fetch_channel(ctx.channel_id)
             except h.ForbiddenError:
                 bot_owner = await bot.fetch_owner()
                 await ctx.respond(bot_missing_permissions_embed(bot_owner))
