@@ -15,9 +15,9 @@ asyncpg = "^0.27.0"
 cryptography = "^41.0.3"
 dateparser = "^1.1.8"
 faust-cchardet = "^2.1.18"
-hikari = { extras = ["speedups"], version = "==2.0.0.dev120" }
+hikari = { extras = ["speedups"], version = "==2.0.0.dev121" }
 hikari-lightbulb = { version = "^2.3.1", extras = ["crontrigger"] }
-hikari-message = {git = "https://github.com/gs729/hikari-message.git", rev = "8bf2908"}
+hikari-message = {git = "https://github.com/gsfernandes81/hikari-message.git", rev = "8bf2908"}
 hikari-miru = "^3.1.2"
 hikari-toolbox = "^0.1.5"
 honcho = "^1.1.0"
@@ -25,7 +25,7 @@ logwood = "^3.1.0"
 python = "~3.11.1"
 regex = "^2023.6.3"
 roman = "^4.1"
-sector_accounting = {git = "https://github.com/gs729/sector_accounting.git", rev = "7b5d567"}
+sector_accounting = {git = "https://github.com/gsfernandes81/sector_accounting.git", rev = "7b5d567"}
 sqlalchemy = "^2.0.1"
 uvloop = "^0.17.0"
 yarl = "^1.9.2"
