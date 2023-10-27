@@ -56,7 +56,7 @@ async def on_start(event: h.StartedEvent):
     )
 
 
-@lb.command("nightfall", "Find out about this weeks reset")
+@lb.command("nightfall", "Find out about this weeks nightfall")
 @lb.implements(lb.SlashCommand)
 async def weekly_reset_command(ctx: lb.Context):
     navigator = NavigatorView(pages=nightfall_pages)
