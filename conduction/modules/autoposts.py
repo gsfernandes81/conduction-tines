@@ -141,7 +141,7 @@ def follow_control_command_maker(
                 h.ChannelType.GUILD_PRIVATE_THREAD,
                 h.ChannelType.GUILD_NEWS_THREAD,
             ]:
-                bot_owner = await bot.fetch_owner(-1)
+                bot_owner = await bot.fetch_owner()
                 await ctx.respond(
                     h.Embed(
                         title="Unsupported channel type",
@@ -233,14 +233,14 @@ def follow_control_command_maker(
                     # If we are missing permissions, then we can't delete the webhook
                     # In this case, notify the user with a list of possibly missing
                     # permissions
-                    bot_owner = await bot.fetch_owner(-1)
+                    bot_owner = await bot.fetch_owner()
                     await ctx.respond(bot_missing_permissions_embed(bot_owner))
                     return
                 else:
                     raise e
         except Exception as e:
             error_reference = randint(1000000, 9999999)
-            bot_owner = await bot.fetch_owner(-1)
+            bot_owner = await bot.fetch_owner()
             await ctx.respond(
                 h.Embed(
                     title="Pardon our dust!",

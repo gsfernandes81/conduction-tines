@@ -96,7 +96,7 @@ class CachedFetchBot(lb.BotApp):
         """This method fetches a user from the cache or from discord if not cached"""
         return self.cache.get_user(user_id) or await self.rest.fetch_user(user_id)
 
-    async def fetch_owner(self, index: int = 0) -> h.User:
+    async def fetch_owner(self, index: int = 1) -> h.User:
         """This method fetches the owner of the bot from the cache or from
         discord if not cached"""
         return await self.fetch_user((await self.fetch_owner_ids())[index])
