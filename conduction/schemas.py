@@ -155,7 +155,24 @@ class MirroredChannel(Base):
             # This condition is phrased specifically to allow
             # empty lists to be returned from the cache
             # Also copy the list to guard against mutation
-            return list(cls._dests_cache[src_id])
+            dests = list(cls._dests_cache[src_id])
+            if len(dests) != await cls.count_dests(src_id, session=session):
+                # There is a condition where the dests_cache is sometimes reduced to
+                # only 1 dest for a given src_id. This is a workaround to prevent
+                # this from returning an incomplete list of dests and hopefully to
+                # aid debugging
+                actual_dests = await cls.fetch_dests(src_id, session=session)
+                print("\n\n\n")
+                logging.error(
+                    "INCONSISTENT DESTS CACHE...\n"
+                    f"\nCached dests: \n{dests}\n"
+                    f"\nActual dests: \n{actual_dests}\n"
+                )
+                print("\n\n\n")
+                dests = actual_dests
+                cls._dests_cache[src_id] = actual_dests
+
+            return dests
         else:
             dests = await cls.fetch_dests(src_id, session=session)
             cls._dests_cache[src_id] = dests
