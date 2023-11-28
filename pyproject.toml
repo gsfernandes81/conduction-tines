@@ -9,7 +9,7 @@ packages = [{ include = "conduction" }]
 
 [tool.poetry.dependencies]
 aiodebug = "^2.3.0"
-aiohttp = "^3.8.3"
+aiohttp = "^3.9.0"
 asyncmy = "^0.2.7rc6"
 asyncpg = "^0.27.0"
 cryptography = "^41.0.3"
