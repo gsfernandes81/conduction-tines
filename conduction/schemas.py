@@ -66,7 +66,7 @@ class MirroredChannel(Base):
         "legacy_disable_for_failure_on_date", DateTime, default=None
     )
     _dests_cache = defaultdict(list)
-    _all_srcs_cache = set()
+    _legacy_srcs_cache = set()
 
     def __init__(
         self,
@@ -103,8 +103,8 @@ class MirroredChannel(Base):
         if legacy and enabled and dest_id not in cls._dests_cache[src_id]:
             cls._dests_cache[src_id].append(dest_id)
 
-        if legacy and src_id not in cls._all_srcs_cache:
-            cls._all_srcs_cache.add(src_id)
+        if legacy and src_id not in cls._legacy_srcs_cache:
+            cls._legacy_srcs_cache.add(src_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -223,11 +223,12 @@ class MirroredChannel(Base):
 
         If you need to ensure that the returned src_ids are valid, use
         fetch_all_srcs instead"""
-        if legacy and cls._all_srcs_cache:
-            return cls._all_srcs_cache
+        if legacy and cls._legacy_srcs_cache:
+            return cls._legacy_srcs_cache
         else:
             srcs = await cls.fetch_all_srcs(legacy=legacy, session=session)
-            cls._all_srcs_cache = set(srcs)
+            if legacy:
+                cls._legacy_srcs_cache = set(srcs)
             return srcs
 
     @classmethod
@@ -307,12 +308,12 @@ class MirroredChannel(Base):
         )
         if legacy:
             cls._dests_cache[src_id].append(dest_id)
-            if src_id not in cls._all_srcs_cache:
-                cls._all_srcs_cache.add(src_id)
+            if src_id not in cls._legacy_srcs_cache:
+                cls._legacy_srcs_cache.add(src_id)
         else:
             cls._dests_cache[src_id].remove(dest_id)
-            if src_id in cls._all_srcs_cache:
-                cls._all_srcs_cache.remove(src_id)
+            if src_id in cls._legacy_srcs_cache:
+                cls._legacy_srcs_cache.remove(src_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -588,8 +589,8 @@ class MirroredChannel(Base):
         for src_id, dest_id in mirrors_to_enable:
             cls._dests_cache[src_id].append(dest_id)
 
-            if src_id not in cls._all_srcs_cache:
-                cls._all_srcs_cache.add(src_id)
+            if src_id not in cls._legacy_srcs_cache:
+                cls._legacy_srcs_cache.add(src_id)
 
         return mirrors_to_enable
 
