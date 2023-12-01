@@ -41,7 +41,9 @@ class CachedFetchBot(lb.BotApp):
             return channel
 
         channel = await self.rest.fetch_channel(channel_id)
-        self.cache.set_guild_channel(channel)
+        if not isinstance(channel, h.GuildThreadChannel):
+            # GuildThreadChannels don't seem to be supported by the cache
+            self.cache.set_guild_channel(channel)
 
         return channel
 

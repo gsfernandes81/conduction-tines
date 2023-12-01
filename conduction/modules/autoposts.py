@@ -200,7 +200,7 @@ def follow_control_command_maker(
 
                     # Check if this is a legacy mirror, and if so, remove it and return
                     if int(ctx.channel_id) in (
-                        await MirroredChannel.get_or_fetch_dests(followable_channel)
+                        await MirroredChannel.fetch_dests(followable_channel)
                     ):
                         await MirroredChannel.remove_mirror(
                             followable_channel, ctx.channel_id, session=session
