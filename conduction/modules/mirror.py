@@ -260,7 +260,10 @@ def ignore_non_src_channels(func):
 
         if (
             # If event is from a known mirror src, keep going
-            (msg and msg.channel_id in await MirroredChannel.get_or_fetch_all_srcs())
+            (
+                msg
+                and msg.channel_id not in await MirroredChannel.get_or_fetch_all_srcs()
+            )
             # also keep going if we are running in a test env
             # keep this towards the end so short circuiting in test_env
             # does not hide logic errors
@@ -301,8 +304,7 @@ async def message_create_repeater_impl(
     backoff_timer = 30
     while True:
         try:
-            mirrors = await MirroredChannel.get_or_fetch_dests(channel.id)
-            if not mirrors:
+            if msg.channel_id not in await MirroredChannel.get_or_fetch_all_srcs():
                 # Return if this channel is not to be mirrored
                 # ie if no mirror list found for it
                 return
@@ -311,10 +313,6 @@ async def message_create_repeater_impl(
             logging.info(
                 f"MessageCreateEvent received for message in channel: {channel_name_or_id}"
             )
-
-            # There is an issue causing only one mirror to be logged and
-            # posted to, print all mirrors to find out what is going on
-            logging.warning(f"{channel_name_or_id.upper()} MIRRORS: {mirrors}")
 
             # The below is to make sure we aren't using a reference to a message that
             # has already changed (in particular, has already been crossposted)
@@ -418,6 +416,7 @@ async def message_create_repeater_impl(
             retries=current_retries,
         )
 
+    mirrors = await MirroredChannel.fetch_dests(channel.id)
     # Always guard against infinite loops through posting to the source channel
     mirrors = list(filter(lambda x: x != channel.id, mirrors))
 
@@ -561,7 +560,7 @@ async def message_update_repeater_impl(msg: h.Message, bot: bot.CachedFetchBot):
     backoff_timer = 30
     while True:
         try:
-            if not await MirroredChannel.get_or_fetch_dests(msg.channel_id):
+            if msg.channel_id not in await MirroredChannel.get_or_fetch_all_srcs():
                 # Return if this channel is not to be mirrored
                 # ie if no mirror list found for it
                 return
@@ -708,7 +707,7 @@ async def message_delete_repeater(event: h.MessageDeleteEvent):
     backoff_timer = 30
     while True:
         try:
-            if not await MirroredChannel.get_or_fetch_dests(event.channel_id):
+            if event.channel_id not in await MirroredChannel.get_or_fetch_all_srcs():
                 # Return if this channel is not to be mirrored
                 # ie if no mirror list found for it
                 return
@@ -892,8 +891,7 @@ async def refresh_server_sizes(bot: bot.CachedFetchBot):
                         for server_id in existing_servers_bin
                     ],
                 )
-
-            MirroredChannel.reset_dests_cache()
+                
         except Exception as e:
             should_retry_ = backoff_timer <= 24 * 60 * 60
 

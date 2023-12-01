@@ -48,10 +48,11 @@ rgx_sub_cmd_name_is_valid = re.compile("^[a-z]{0,1}[a-z0-9_-]{0,31}$")
 
 
 class MirroredChannel(Base):
-    """Cache enabled mirror channels model
+    """Mirror channels model
 
-    Cache only implemented for fetches with src_id for legacy mirrors
-    with the get_dests method and invalidated on additions and deletions"""
+    with a cache for the list of all legacy source channgel ids only.
+    Note, the src_ids cache will not remove elements from the cache even
+    if the last mirror from it has been disabled"""
 
     __tablename__ = "mirrored_channel"
     __mapper_args__ = {"eager_defaults": True}
@@ -65,8 +66,7 @@ class MirroredChannel(Base):
     legacy_disable_for_failure_on_date = Column(
         "legacy_disable_for_failure_on_date", DateTime, default=None
     )
-    _dests_cache = defaultdict(list)
-    _all_srcs_cache = set()
+    _legacy_srcs_cache = set()
 
     def __init__(
         self,
@@ -100,11 +100,8 @@ class MirroredChannel(Base):
             cls(src_id, dest_id, dest_server_id, legacy, enabled=enabled)
         )
 
-        if legacy and enabled and dest_id not in cls._dests_cache[src_id]:
-            cls._dests_cache[src_id].append(dest_id)
-
-        if legacy and src_id not in cls._all_srcs_cache:
-            cls._all_srcs_cache.add(src_id)
+        if legacy and src_id not in cls._legacy_srcs_cache:
+            cls._legacy_srcs_cache.add(src_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -147,43 +144,6 @@ class MirroredChannel(Base):
 
     @classmethod
     @utils.ensure_session(db_session)
-    async def get_or_fetch_dests(
-        cls, src_id: int, session: Optional[AsyncSession] = None
-    ) -> List[int]:
-        src_id = int(src_id)
-        if src_id in cls._dests_cache:
-            # This condition is phrased specifically to allow
-            # empty lists to be returned from the cache
-            # Also copy the list to guard against mutation
-            dests = list(cls._dests_cache[src_id])
-            if len(dests) != await cls.count_dests(src_id, session=session):
-                # There is a condition where the dests_cache is sometimes reduced to
-                # only 1 dest for a given src_id. This is a workaround to prevent
-                # this from returning an incomplete list of dests and hopefully to
-                # aid debugging
-                actual_dests = await cls.fetch_dests(src_id, session=session)
-                print("\n\n\n")
-                logging.error(
-                    "INCONSISTENT DESTS CACHE...\n"
-                    f"\nCached dests: \n{dests}\n"
-                    f"\nActual dests: \n{actual_dests}\n"
-                )
-                print("\n\n\n")
-                dests = actual_dests
-                cls._dests_cache[src_id] = actual_dests
-
-            return dests
-        else:
-            dests = await cls.fetch_dests(src_id, session=session)
-            cls._dests_cache[src_id] = dests
-            return dests
-
-    @classmethod
-    def reset_dests_cache(self):
-        self._dests_cache = defaultdict(list)
-
-    @classmethod
-    @utils.ensure_session(db_session)
     async def fetch_srcs(
         cls,
         dest_id: int,
@@ -216,18 +176,19 @@ class MirroredChannel(Base):
     ) -> Set[int]:
         """Fetch all srcs
 
-        WARNING: This is function has a failure mode where it will return
+        WARNING: This is function has a silent failure mode where it will return
         src_ids that may have been deleted with the removal of the last mirror
         with this src. This is intentional to avoid the overhead of clearing
         and refetching the cache on every mirror removal.
 
         If you need to ensure that the returned src_ids are valid, use
         fetch_all_srcs instead"""
-        if legacy and cls._all_srcs_cache:
-            return cls._all_srcs_cache
+        if legacy and cls._legacy_srcs_cache:
+            return cls._legacy_srcs_cache
         else:
             srcs = await cls.fetch_all_srcs(legacy=legacy, session=session)
-            cls._all_srcs_cache = set(srcs)
+            if legacy:
+                cls._legacy_srcs_cache = set(srcs)
             return srcs
 
     @classmethod
@@ -306,13 +267,11 @@ class MirroredChannel(Base):
             .values(legacy=legacy)
         )
         if legacy:
-            cls._dests_cache[src_id].append(dest_id)
-            if src_id not in cls._all_srcs_cache:
-                cls._all_srcs_cache.add(src_id)
+            if src_id not in cls._legacy_srcs_cache:
+                cls._legacy_srcs_cache.add(src_id)
         else:
-            cls._dests_cache[src_id].remove(dest_id)
-            if src_id in cls._all_srcs_cache:
-                cls._all_srcs_cache.remove(src_id)
+            if src_id in cls._legacy_srcs_cache:
+                cls._legacy_srcs_cache.remove(src_id)
 
     @classmethod
     @utils.ensure_session(db_session)
@@ -328,10 +287,6 @@ class MirroredChannel(Base):
             )
             .values(enabled=False)
         )
-        try:
-            cls._dests_cache[src_id].remove(dest_id)
-        except ValueError:
-            pass
 
         # Note: We deliberately don't remove the src_id from the _all_srcs_cache
         # since we don't know if there are other mirrors with the same src_id
@@ -352,11 +307,6 @@ class MirroredChannel(Base):
             .where(and_(cls.dest_id == dest_id, cls.enabled == True))
             .values(enabled=False)
         )
-        for src_id in src_ids:
-            try:
-                cls._dests_cache[src_id].remove(dest_id)
-            except ValueError:
-                pass
 
         # Note: We deliberately don't remove the src_ids from the _all_srcs_cache
         # since we don't know if there are other mirrors with the same src_id
@@ -515,13 +465,6 @@ class MirroredChannel(Base):
             )
         )
 
-        # Remove disabled mirrors from the cache
-        for src_id, dest_id in mirrors_to_disable:
-            try:
-                cls._dests_cache[src_id].remove(dest_id)
-            except ValueError:
-                pass
-
         # Note: We deliberately don't remove the src_id from the _all_srcs_cache
         # since we don't know if there are other mirrors with the same src_id
         # and clearing and refetching would be needlessly expensive
@@ -585,11 +528,7 @@ class MirroredChannel(Base):
         )
 
         # Add reenabled mirrors to the cache
-        for src_id, dest_id in mirrors_to_enable:
-            cls._dests_cache[src_id].append(dest_id)
-
-            if src_id not in cls._all_srcs_cache:
-                cls._all_srcs_cache.add(src_id)
+        cls._legacy_srcs_cache.update(set([src_id for src_id, _ in mirrors_to_enable]))
 
         return mirrors_to_enable
 
