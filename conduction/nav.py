@@ -102,14 +102,29 @@ class DateRangeDict(t.Dict[dt.datetime, MessagePrototype]):
         if isinstance(key, int):
             key = self.index_to_date(key)
         if not isinstance(key, dt.datetime):
-            raise TypeError("Key must be of type datetime.datetime")
+            raise TypeError("Key must be of type datetime.datetime or int")
+
+        self._truncate_outside_limits()
 
         if not (self.limits[0] <= key <= self.limits[1]):
             raise IndexError(f"Key {key} is not in range {self.limits}")
 
-        self._truncate_outside_limits()
         key = self.round_down(key)
         return super().__getitem__(key)
+
+    def __contains__(self, __key: dt.datetime | int) -> bool:
+        if isinstance(__key, int):
+            __key = self.index_to_date(__key)
+        if not isinstance(__key, dt.datetime):
+            raise TypeError("Key must be of type datetime.datetime or int")
+
+        self._truncate_outside_limits()
+
+        if not (self.limits[0] <= __key <= self.limits[1]):
+            return False
+
+        __key = self.round_down(__key)
+        return super().__contains__(__key)
 
     def __setitem__(self, key: dt.datetime, value: MessagePrototype) -> None:
         if not isinstance(key, dt.datetime):
@@ -148,20 +163,38 @@ class NavigatorView(nav.NavigatorView):
         pages: "NavPages",
         timeout: t.Optional[t.Union[float, int, dt.timedelta]] = navigator_timeout,
         autodefer: bool = True,
+        allow_start_on_blank_page: bool = False,
     ) -> None:
-        super().__init__(pages=pages, timeout=timeout, autodefer=autodefer)
+        ### hikari-miru NavigatorView init ###
+        # The only differences between this and the original is that
+        # the pages object is not checked to be non-empty and
+        # the default buttons are always added to the view
+        self._pages: t.Sequence[
+            t.Union[str, h.Embed, t.Sequence[h.Embed], nav.Page]
+        ] = pages
+        self._current_page: int = 0
+        self._ephemeral: bool = False
+        # The last interaction received, used for inter-based handling
+        self._inter: t.Optional[h.MessageResponseMixin[t.Any]] = None
+        super(nav.NavigatorView, self).__init__(timeout=timeout, autodefer=autodefer)
+
+        default_buttons = self.get_default_buttons()
+        for default_button in default_buttons:
+            self.add_item(default_button)
+
         self._pages = pages
-        # Set current page to the first non blank page
-        while True:
-            try:
-                current_page = pages[self.current_page]
-                if current_page.embeds and current_page.embeds[0] == NO_DATA_HERE_EMBED:
-                    self.current_page = self.current_page - 1
-                else:
+        ### hikari-miru NavigatorView init end ###
+
+        if allow_start_on_blank_page:
+            self.current_page = 0
+        else:
+            # Set current page to the first non blank page
+            for page_no in range(0, -self.pages.history_len, -1):
+                if page_no in self.pages:
+                    self.current_page = page_no
                     break
-            except IndexError:
+            else:
                 self.current_page = 0
-                break
 
     async def send(
         self,
@@ -238,7 +271,10 @@ class NavigatorView(nav.NavigatorView):
         await context.edit_response(**payload)
 
     def get_default_buttons(self) -> t.Sequence[nav.NavButton]:
-        return [PrevButton(), IndicatorButton(), NextButton()]
+        if (self.pages.history_len + self.pages.lookahead_len) == 1:
+            return []
+        else:
+            return [PrevButton(), IndicatorButton(), NextButton()]
 
     @property
     def pages(self) -> "NavPages":
@@ -303,6 +339,9 @@ class NavPages(DateRangeDict):
         lookahead_len: t.Optional[int] = 0,
         lookahead_update_interval: t.Optional[int] = 1800,
         suppress_content_autoembeds: t.Optional[bool] = True,
+        no_data_message: t.Optional[MessagePrototype] = MessagePrototype(
+            embeds=[NO_DATA_HERE_EMBED]
+        ),
     ):
         super().__init__(period)
         self.history_len = history_len
@@ -313,12 +352,13 @@ class NavPages(DateRangeDict):
 
         self._reference_date = reference_date
         self._suppress_content_autoembeds = suppress_content_autoembeds
+        self.no_data_message = no_data_message
 
     def __getitem__(self, key: dt.datetime | int) -> MessagePrototype:
         try:
             return super().__getitem__(key)
         except KeyError:
-            return MessagePrototype(embeds=[NO_DATA_HERE_EMBED])
+            return self.no_data_message
 
     @property
     def limits(self) -> t.Tuple[dt.datetime, dt.datetime]:
