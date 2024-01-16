@@ -17,12 +17,13 @@ import datetime as dt
 
 import hikari as h
 import lightbulb as lb
+from hmessage import HMessage as MessagePrototype
 
 from .. import cfg
 from ..nav import NavigatorView, NavPages
 from .autoposts import autopost_command_group, follow_control_command_maker
 
-REFERENCE_DATE = dt.datetime(2023, 7, 14, 17, tzinfo=dt.timezone.utc)
+REFERENCE_DATE = dt.datetime(2024, 1, 9, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["trials"]
 
@@ -36,6 +37,9 @@ async def on_start(event: h.StartedEvent):
         period=dt.timedelta(days=7),
         reference_date=REFERENCE_DATE,
         suppress_content_autoembeds=False,
+        no_data_message=MessagePrototype(
+            content="Trials is unavailable for this week."
+        ),
     )
 
 
