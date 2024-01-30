@@ -15,20 +15,19 @@
 
 import logging
 
-import logwood.compat
 import aiodebug.log_slow_callbacks
-
 import hikari as h
 import lightbulb as lb
+import logwood.compat
 import miru
 import uvloop
 from lightbulb.ext import tasks
 
-from . import cfg, modules, schemas, help
-from .bot import CachedFetchBot, UserCommandBot, CustomHelpBot
+from . import cfg, help, modules, schemas
+from .bot import CachedFetchBot, CustomHelpBot, ServerEmojiEnabledBot, UserCommandBot
 
 
-class Bot(UserCommandBot, CachedFetchBot, CustomHelpBot):
+class Bot(ServerEmojiEnabledBot, UserCommandBot, CachedFetchBot, CustomHelpBot):
     pass
 
 
@@ -40,6 +39,7 @@ bot = Bot(
     user_command_schema=schemas.UserCommand,
     help_class=help.HelpCommand,
     help_slash_command=True,
+    emoji_servers=[cfg.kyber_discord_server_id],
 )
 
 

@@ -22,6 +22,7 @@ import typing as t
 import hikari as h
 import lightbulb as lb
 import miru as m
+from lightbulb.ext import tasks
 from yarl import URL
 
 from . import cfg, schemas, utils
@@ -248,7 +249,10 @@ class UserCommandBot(lb.BotApp):
 
     def command(
         self, cmd: t.Optional[lb.CommandLike | schemas.UserCommand] = None
-    ) -> t.Union[lb.CommandLike, t.Callable[[lb.CommandLike], lb.CommandLike],]:
+    ) -> t.Union[
+        lb.CommandLike,
+        t.Callable[[lb.CommandLike], lb.CommandLike],
+    ]:
         """Handle schema based commands and lightbulb commands
 
         Throws a utils.FriendlyValueError if a schema command is already defined"""
@@ -277,9 +281,10 @@ class UserCommandBot(lb.BotApp):
         cmd: schemas.UserCommand,
     ) -> t.Coroutine:
         # Create a decorator for the command
-        decorator = lambda func: lb.command(cmd.ln_names[-1], cmd.description)(
-            lb.implements(SchemaBackedCommand.impl_from_user_command(cmd))(func)
-        )
+        def decorator(func):
+            return lb.command(cmd.ln_names[-1], cmd.description)(
+                lb.implements(SchemaBackedCommand.impl_from_user_command(cmd))(func)
+            )
 
         if cmd.response_type == 0:
 
@@ -452,3 +457,28 @@ class CustomHelpBot(lb.BotApp):
                 commands_group = command.subcommands
 
         return command_map
+
+
+class ServerEmojiEnabledBot(CachedFetchBot):
+    def __init__(self, *args, emoji_servers: t.List[int] = [], **kwargs):
+        super().__init__(*args, **kwargs)
+        self._emoji_servers: t.List[int] = emoji_servers
+        self.emoji: t.Dict[str, h.Emoji] = {}
+
+        tasks.task(
+            s=240,  # Interval at which to refresh emoji
+            auto_start=True,
+            wait_before_execution=True,
+        )(self.refresh_emoji)
+
+        self.listen(h.StartingEvent)(self.refresh_emoji_with_event)
+
+    async def refresh_emoji(self):
+        for server in reversed(self._emoji_servers):
+            guild = await self.fetch_guild(server)
+            for emoji in await guild.fetch_emojis():
+                self.emoji[emoji.name] = emoji
+
+    @classmethod
+    async def refresh_emoji_with_event(cls, event: h.StartingEvent):
+        await cls.refresh_emoji(event.app)

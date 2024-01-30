@@ -14,24 +14,43 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import datetime as dt
+import logging
 import typing as t
 
 import aiohttp
 import hikari as h
 import lightbulb as lb
+import regex as re
 import sector_accounting
 from hmessage import HMessage as MessagePrototype
 
 from .. import cfg, utils
-from ..bot import CachedFetchBot, UserCommandBot
-from ..nav import NavigatorView, NavPages, NO_DATA_HERE_EMBED
+from ..bot import CachedFetchBot, ServerEmojiEnabledBot, UserCommandBot
+from ..nav import NO_DATA_HERE_EMBED, NavigatorView, NavPages
 from ..utils import space
-import logging
 from .autoposts import autopost_command_group, follow_control_command_maker
 
 REFERENCE_DATE = dt.datetime(2023, 7, 20, 17, tzinfo=dt.timezone.utc)
 
 FOLLOWABLE_CHANNEL = cfg.followables["lost_sector"]
+
+re_user_side_emoji = re.compile("(<a?)?:(\w+)(~\d)*:(\d+>)?")
+
+
+def construct_emoji_substituter(
+    emoji_dict: t.Dict[str, h.Emoji],
+) -> t.Callable[[re.Match], str]:
+    """Constructs a substituter for user-side emoji to be used in re.sub"""
+
+    def func(match: re.Match) -> str:
+        maybe_emoji_name = str(match.group(2))
+        return str(
+            emoji_dict.get(maybe_emoji_name)
+            or emoji_dict.get(maybe_emoji_name.lower())
+            or match.group(0)
+        )
+
+    return func
 
 
 def _fmt_count(emoji: str, count: int, width: int) -> str:
@@ -47,6 +66,7 @@ def _fmt_count(emoji: str, count: int, width: int) -> str:
 def format_counts(
     legend_data: sector_accounting.sector_accounting.DifficultySpecificSectorData,
     master_data: sector_accounting.sector_accounting.DifficultySpecificSectorData,
+    emoji_dict: t.Dict[str, h.Emoji],
 ) -> str:
     len_bar = len(
         str(max(legend_data.barrier_champions, master_data.barrier_champions, key=abs))
@@ -86,12 +106,14 @@ def format_counts(
             filter(
                 None,
                 [
-                    _fmt_count(cfg.emoji["barrier"], data.barrier_champions, len_bar),
+                    _fmt_count(emoji_dict["barrier"], data.barrier_champions, len_bar),
                     _fmt_count(
-                        cfg.emoji["overload"], data.overload_champions, len_oload
+                        emoji_dict["overload"], data.overload_champions, len_oload
                     ),
                     _fmt_count(
-                        cfg.emoji["unstoppable"], data.unstoppable_champions, len_unstop
+                        emoji_dict["unstoppable"],
+                        data.unstoppable_champions,
+                        len_unstop,
                     ),
                 ],
             )
@@ -100,11 +122,11 @@ def format_counts(
             filter(
                 None,
                 [
-                    _fmt_count(cfg.emoji["arc"], data.arc_shields, len_arc),
-                    _fmt_count(cfg.emoji["void"], data.void_shields, len_void),
-                    _fmt_count(cfg.emoji["solar"], data.solar_shields, len_solar),
-                    _fmt_count(cfg.emoji["stasis"], data.stasis_shields, len_stasis),
-                    _fmt_count(cfg.emoji["strand"], data.strand_shields, len_strand),
+                    _fmt_count(emoji_dict["arc"], data.arc_shields, len_arc),
+                    _fmt_count(emoji_dict["void"], data.void_shields, len_void),
+                    _fmt_count(emoji_dict["solar"], data.solar_shields, len_solar),
+                    _fmt_count(emoji_dict["stasis"], data.stasis_shields, len_stasis),
+                    _fmt_count(emoji_dict["strand"], data.strand_shields, len_strand),
                 ],
             )
         )
@@ -134,6 +156,7 @@ async def format_sector(
     secondary_embed_title: str | None = "",
     secondary_embed_description: str | None = "",
     date: dt.datetime = None,
+    emoji_dict: t.Dict[str, h.Emoji] = None,
 ) -> MessagePrototype:
     # Follow the hyperlink to have the newest image embedded
     try:
@@ -142,31 +165,12 @@ async def format_sector(
         ls_gfx_url = None
 
     # Surges to emojis
-    _surges = [surge.lower() for surge in sector.surges]
     surges = []
-    if "solar" in _surges:
-        surges += [cfg.emoji["solar"]]
-    if "arc" in _surges:
-        surges += [cfg.emoji["arc"]]
-    if "void" in _surges:
-        surges += [cfg.emoji["void"]]
-    if "stasis" in _surges:
-        surges += [cfg.emoji["stasis"]]
-    if "strand" in _surges:
-        surges += [cfg.emoji["strand"]]
+    for surge in sector.surges:
+        surges += [str(emoji_dict.get(surge) or emoji_dict.get(surge.lower()))]
 
     # Threat to emoji
-    threat = sector.threat.lower()
-    if threat == "solar":
-        threat = cfg.emoji["solar"]
-    elif threat == "arc":
-        threat = cfg.emoji["arc"]
-    elif threat == "void":
-        threat = cfg.emoji["void"]
-    elif threat == "stasis":
-        threat = cfg.emoji["stasis"]
-    elif threat == "strand":
-        threat = cfg.emoji["strand"]
+    threat = emoji_dict.get(sector.threat) or emoji_dict.get(sector.threat.lower())
 
     overcharged_weapon_emoji = (
         "⚔️" if sector.overcharged_weapon.lower() in ["sword", "glaive"] else "🔫"
@@ -179,6 +183,13 @@ async def format_sector(
         sector_name = sector.name
         sector_location = None
 
+    # Legendary weapon rewards
+    legendary_weapon_rewards = sector.legendary_rewards
+
+    legendary_weapon_rewards = re_user_side_emoji.sub(
+        construct_emoji_substituter(emoji_dict), legendary_weapon_rewards
+    )
+
     if date:
         suffix = utils.get_ordinal_suffix(date.day)
         title = f"Lost Sector for {date.strftime('%B %-d')}{suffix}"
@@ -189,35 +200,39 @@ async def format_sector(
         h.Embed(
             title=f"**{title}**",
             description=(
-                f"{cfg.emoji['ls']}{space.three_per_em}{sector_name}\n"
+                f"{emoji_dict['LS']}{space.three_per_em}{sector_name}\n"
                 + (
-                    f"{cfg.emoji['location']}{space.three_per_em}{sector_location}\n"
+                    f"{emoji_dict['location']}{space.three_per_em}{sector_location}\n"
                     if sector_location
                     else ""
                 )
-                + f"\n"
+                + "\n"
             ),
             color=cfg.embed_default_color,
             url="https://lostsectortoday.com/",
         )
         .add_field(
-            name=f"Reward",
-            value=f"{cfg.emoji['exotic_engram']}{space.three_per_em}Exotic {sector.reward} (If-Solo)",
+            name="Reward",
+            value=f"{emoji_dict['exotic_engram']}{space.three_per_em}Exotic {sector.reward} (If-Solo)",
         )
         .add_field(
-            name=f"Champs and Shields",
-            value=format_counts(sector.legend_data, sector.master_data),
+            name="Champs and Shields",
+            value=format_counts(sector.legend_data, sector.master_data, emoji_dict),
         )
         .add_field(
-            name=f"Elementals",
+            name="Elementals",
             value=f"Surge: {space.punctuation}{space.hair}{space.hair}"
             + " ".join(surges)
             + f"\nThreat: {threat}",
         )
         .add_field(
-            name=f"Modifiers",
-            value=f"{cfg.emoji['swords']}{space.three_per_em}{sector.to_sector_v1().modifiers}"
+            name="Modifiers",
+            value=f"{emoji_dict['swords']}{space.three_per_em}{sector.to_sector_v1().modifiers}"
             + f"\n{overcharged_weapon_emoji}{space.three_per_em}Overcharged {sector.overcharged_weapon}",
+        )
+        .add_field(
+            "Legendary Weapons (If-Solo)",
+            legendary_weapon_rewards,
         )
     )
 
@@ -242,6 +257,8 @@ async def format_sector(
 
 
 class SectorMessages(NavPages):
+    bot: ServerEmojiEnabledBot
+
     def preprocess_messages(self, messages: t.List[h.Message | MessagePrototype]):
         for m in messages:
             m.embeds = utils.filter_discord_autoembeds(m)
@@ -294,7 +311,9 @@ class SectorMessages(NavPages):
                 # Follow the hyperlink to have the newest image embedded
                 lookahead_dict = {
                     **lookahead_dict,
-                    date: await format_sector(sector, date=date),
+                    date: await format_sector(
+                        sector, date=date, emoji_dict=self.bot.emoji
+                    ),
                 }
 
         return lookahead_dict

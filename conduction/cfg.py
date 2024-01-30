@@ -15,13 +15,13 @@
 
 import datetime as dt
 import json
+import logging
 import ssl
+import typing as t
 from os import getenv as __getenv
 
 import hikari as h
-import typing as t
 import regex as re
-import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -150,7 +150,6 @@ alerts_channel = int(_getenv("ALERTS_CHANNEL_ID"))
 # Discord constants
 embed_default_color = h.Color(int(_getenv("EMBED_DEFAULT_COLOR"), 16))
 embed_error_color = h.Color(int(_getenv("EMBED_ERROR_COLOR"), 16))
-emoji = json.loads(_getenv("EMOJI"))
 followables: t.Dict[str, int] = json.loads(_getenv("FOLLOWABLES"), parse_int=int)
 default_url = _getenv("DEFAULT_URL")
 navigator_timeout = int(_getenv("NAVIGATOR_TIMEOUT") or 120)
