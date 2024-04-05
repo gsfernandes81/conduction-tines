@@ -61,8 +61,12 @@ def _lightbulb_params() -> dict:
     return lightbulb_params
 
 
-def _db_urls(var_name: str) -> tuple[str, str]:
-    db_url = _getenv(var_name)
+def _db_urls(var_name: str, var_name_alternative) -> tuple[str, str]:
+    try:
+        db_url = _getenv(var_name)
+    except ValueError:
+        db_url = _getenv(var_name_alternative)
+
     __repl_till = db_url.find("://")
     db_url = db_url[__repl_till:]
     db_url_async = "mysql+asyncmy" + db_url
@@ -155,7 +159,7 @@ default_url = _getenv("DEFAULT_URL")
 navigator_timeout = int(_getenv("NAVIGATOR_TIMEOUT") or 120)
 
 # Database URLs
-db_url, db_url_async = _db_urls("MYSQL_URL")
+db_url, db_url_async = _db_urls("MYSQL_PRIVATE_URL", "MSQL_URL")
 
 # Sheets credentials & URLs
 gsheets_credentials = _sheets_credentials(
