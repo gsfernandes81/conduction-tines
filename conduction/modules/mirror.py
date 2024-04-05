@@ -24,10 +24,13 @@ import attr
 import dateparser
 import hikari as h
 import lightbulb as lb
+import regex as re
 from lightbulb.ext import tasks
 
 from .. import bot, cfg, utils
 from ..schemas import MirroredChannel, MirroredMessage, ServerStatistics
+
+re_markdown_link = re.compile(r"\[(.*?)\]\(.*?\)")
 
 
 class TimedSemaphore(aio.Semaphore):
@@ -89,6 +92,10 @@ def _get_message_summary(msg: h.Message, default: str = "Link") -> str:
     summary = summary.strip("<>")
     summary = summary.strip("")
     summary = summary.capitalize()
+
+    # Use re_markdown_link to remove links replacing
+    # them with just the text unless the text is empty
+    summary = re_markdown_link.sub(r"\1", summary) or summary
 
     return summary
 
@@ -187,17 +194,11 @@ async def log_mirror_progress_to_discord(
                     if source_channel
                     else "Unknown",
                     inline=True,
-                ).add_field(
-                    "Completed", str(successes), inline=True
-                ).add_field(
+                ).add_field("Completed", str(successes), inline=True).add_field(
                     "Retrying", str(retries), inline=True
-                ).add_field(
-                    "Failed", str(failures), inline=True
-                ).add_field(
+                ).add_field("Failed", str(failures), inline=True).add_field(
                     "Remaining", str(pending), inline=True
-                ).add_field(
-                    "Time taken", f"{time_taken}"
-                ).add_field(
+                ).add_field("Time taken", f"{time_taken}").add_field(
                     "98% time",
                     time_taken if progress_fraction >= 0.98 else "TBC",
                 )
