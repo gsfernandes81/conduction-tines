@@ -14,11 +14,11 @@
 # conduction-tines. If not, see <https://www.gnu.org/licenses/>.
 
 import datetime as dt
+import logging
 import typing as t
 
 import hikari as h
 import lightbulb as lb
-import regex as re
 from hmessage import HMessage as MessagePrototype
 
 from .. import cfg, utils
@@ -36,11 +36,29 @@ class NightfallPages(NavPages):
     ) -> MessagePrototype:
         for m in messages:
             m.embeds = utils.filter_discord_autoembeds(m)
-        msg_proto = (
-            utils.accumulate([MessagePrototype.from_message(m) for m in messages])
-            .merge_content_into_embed()
-            .merge_attachements_into_embed(default_url=cfg.default_url)
-        )
+
+        try:
+            msg_proto = (
+                utils.accumulate([MessagePrototype.from_message(m) for m in messages])
+                .merge_content_into_embed()
+                .merge_attachements_into_embed(default_url=cfg.default_url)
+            )
+        except ValueError as e:
+            e.add_note(
+                "Issue while processing messages with ids:"
+                + ", ".join(str(m.id) for m in messages)
+            )
+            logging.exception(e)
+            msg_proto = MessagePrototype(
+                embeds=[
+                    h.Embed(
+                        title="Error",
+                        color=cfg.embed_error_color,
+                        description="There was an issue processing the information "
+                        "for this week.",
+                    )
+                ],
+            )
 
         return msg_proto
 
