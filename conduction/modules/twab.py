@@ -89,14 +89,14 @@ async def on_start(event: h.StartedEvent):
     )
 
 
-@lb.command("twid", "Find out about This Week In Destinty (formerly the TWAB)")
+@lb.command("twid", "Find out about This Week In Destiny (formerly the TWAB)")
 @lb.implements(lb.SlashCommand)
 async def twid(ctx: lb.Context):
     navigator = NavigatorView(pages=twidpages, autodefer=True)
     await navigator.send(ctx.interaction)
 
 
-@lb.command("twab", "Find out about This Week In Destinty (formerly the TWAB)")
+@lb.command("twab", "Find out about This Week In Destiny (formerly the TWAB)")
 @lb.implements(lb.SlashCommand)
 async def twab(ctx: lb.Context):
     navigator = NavigatorView(pages=twidpages, autodefer=True)
